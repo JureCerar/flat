@@ -3,11 +3,11 @@ from pymol import cmd, CmdException
 @cmd.extend
 def renumber(selection, start=1, quiet=False):
   """
-DESCRIPTION
-  Set residue numbering (resi) based on connectivity.
-ARGUMENTS
-  selection = string: atom selection to renumber {default: all}
-  start = integer: counting start {default: 1}
+  DESCRIPTION
+    Set residue numbering (resi) based on connectivity.
+  ARGUMENTS
+    selection = string: atom selection to renumber {default: all}
+    start = integer: counting start {default: 1}
   """
   import sys
   start, quiet = int(start), bool(quiet)
