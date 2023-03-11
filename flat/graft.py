@@ -19,7 +19,7 @@ def renumber(selection, start=1, quiet=False):
     'next(atom_it).model = model',
     space={
       'atom_it': iter(model.atom),
-      'next': next
+      'next': next,
     }
   )
   startatom = model.atom[0]
@@ -54,7 +54,7 @@ def renumber(selection, start=1, quiet=False):
     'resi = next(atom_it).resi',
     space={
       'atom_it': iter(model.atom),
-      'next': next
+      'next': next,
     }
   )
   sys.setrecursionlimit(limit)
@@ -64,15 +64,21 @@ def renumber(selection, start=1, quiet=False):
 
 
 @cmd.extend
-def graft (mobile, target, output=None):
+def graft (mobile, target, out=None, minimize=True):
   """
 DESCRIPTION
-  Graft mobile structure on target structure.
+  Graft mobile structure on target structure. For successfulk graft,
+  similarity between aligned mobile and target structure must be > 80 %.
 ARGUMENTS
   mobile = string: atom selection of mobile section 
   target = string: atom selection of target section 
-  output = string: output structure name {default: None}
+  out = string: output structure name {default: None}
+  minimize = bool: Do a short minimization of grafted structure {default: True}
   """
+  minimize = bool(minimize)
+  if minimize:
+    from minimize import minimize_ob
+
   if len(cmd.get_chains(mobile)) != 1:
     raise CmdException("Mobile selection must contain only one chain")
   if len(cmd.get_chains(target)) != 1:
@@ -86,13 +92,13 @@ ARGUMENTS
   cmd.copy_to(_target, target, rename="", zoom=0)
   target_len = len(cmd.get_model(_target).get_residues())
 
-  # Clean-up mobile section to match target
+  # Clean-up mobile section; chain and segi must match target section.
   model = cmd.get_model(_target)
-  chain, segi = model.atom[1].chain, model.atom[1].segi
+  chain, segi = model.atom[0].chain, model.atom[0].segi
   cmd.alter(_mobile, f"chain='{chain}'; segi='{segi}'")
   cmd.remove(f"{_mobile} & name OXT")
 
-  # cealign metod works best for aligment
+  # 'cealign' method works best for aligment
   cmd.extra_fit(_mobile, _target, "cealign", mobile_state=-1, target_state=-1)
   align = cmd.get_unused_name("align")
   score = cmd.align(_mobile, _target, quiet=0, object=align)
@@ -102,53 +108,73 @@ ARGUMENTS
   # Renumber target and mobile to correct numbering
   model = cmd.get_model(f"{align} & {_target}")
   first, last = int(model.atom[0].resi), int(model.atom[-1].resi)
-  renumber(_target, start=1)
+
+  if not out:
+    out = cmd.get_unused_name("out")
   renumber(_mobile, start=first)
-  cmd.remove(f"{_target} & resi {first}-{last}")
-  cmd.delete(align)
+  cmd.copy_to(out, _mobile, rename="", zoom=0)
 
-  # Combine to new objects
-  if not output:
-    output = cmd.get_unused_name("out")
-  cmd.copy_to(output, _target, rename="", zoom=0)
-  cmd.copy_to(output, _mobile, rename="", zoom=0)
-  cmd.delete(_target)
+  # Split target section into left and right objects.
+  # Correctly renumber objects and then combine/join them.
+  # Do a energy minimization around newly bonded sections.
+  if first > 1:
+    target_left = cmd.get_unused_name("target_left")
+    cmd.select(target_left, f"{_target} & resi 1-{first-1}")
+    renumber(target_left, start=1)
+    cmd.copy_to(out, target_left, rename="", zoom=0)
+    cmd.bond(
+      f"/{out}///{first-1}/C",
+      f"/{out}///{first}/N",
+    )
+    cmd.delete(target_left)
+    if minimize:
+      minimize_ob(
+        f"{out} & resi {first} around {10.0}",
+        ff="UFF",
+        conv=0.00001,
+        nsteps=500,
+        quiet=0,
+      )
+
+  if last < target_len:
+    target_right = cmd.get_unused_name("target_right")
+    cmd.select(target_right, f"{_target} & resi {last+1}-{target_len}")
+    renumber(target_right, start=mobile_len+first)
+    cmd.copy_to(out, target_right, rename="", zoom=0)
+    cmd.bond(
+      f"/{out}///{first+mobile_len-1}/C",
+      f"/{out}///{first+mobile_len}/N",
+    )
+    cmd.delete(target_right)
+    if minimize:
+      minimize_ob(
+        f"{out} & resi {first+mobile_len} around {10.0}",
+        ff="UFF",
+        conv=0.00001,
+        nsteps=500,
+        quiet=0,
+      )
+
+  # Clean-up objects (in order they were created)
   cmd.delete(_mobile)
-
-  # Bond mobile and target chains.
-  try:
-    cmd.bond(f"/{output}///{last}/C", f"/{output}///{last+1}/N")
-    cmd.bond(f"/{output}///{first-1}/C", f"/{output}///{first}/N")
-  except:
-    pass
-
-  # Minimize around new bond to avoid any clashes.
-  cmd.rebuild(output)
-  # try:
-  #   from minimize import minimize_ob
-  #   sele = cmd.get_unused_name("sele")
-  #   cmd.select(sele, f"{output} & resi {last} around {10.0}")
-  #   minimize_ob(sele, state=-1, ff="UFF", nsteps=500, quiet=0)
-  # finally:
-  #   cmd.delete(sele)
+  cmd.delete(_target)
+  cmd.delete(align)
 
   return
 
 
 cmd.delete("all")
-mobile = "1gig"
-target = "1hzh"
+mobile = "1dlf"
+target = "1gig"
+
 cmd.load("conf/{}.pdb".format(mobile), mobile)
 cmd.load("conf/{}.pdb".format(target), target)
 
-
-graft(f"{mobile} & chain H", f"{target} & chain H")
-graft(f"{mobile} & chain L", f"{target} & chain L")
+graft(f"{mobile} & chain H", f"{target} & chain H", minimize=False)
+graft(f"{mobile} & chain L", f"{target} & chain L", minimize=False)
 
 cmd.delete(mobile)
 cmd.delete(target)
 
 cmd.save("out.pdb")
 
-# cmd.delete(mobile)
-# cmd.delete(target)
