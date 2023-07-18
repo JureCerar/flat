@@ -7,12 +7,12 @@ from chempy import cpv
 def beautify(selection="all", mode=0):
     """
     DESCRIPTION
-      Display molecules in pretty representation.
+        Display molecules in pretty representation.
     USAGE
-      beautify [ selection [, mode ]]
+        beautify [ selection [, mode ]]
     ARGUMENTS
-      selection = str: Atom selection. {default: all}
-      mode = int: ... {default: 0}
+        selection = str: Atom selection. {default: all}
+        mode = int: ... {default: 0}
     """
     mode = int(mode)
     cmd.hide("everything")
@@ -29,11 +29,11 @@ def beautify(selection="all", mode=0):
 def filter(mode=1):
     """
     DESCRIPTION
-      Apply different (instagram) filter to molecules for rendering.
+        Apply different (instagram) filter to molecules for rendering.
     USAGE
-      filter [ mode ]
+        filter [ mode ]
     ARGUMENTS
-      mode = int: ... {default: 1}
+        mode = int: ... {default: 1}
     """
     mode = int(mode)
     if mode == 1:
@@ -129,11 +129,9 @@ class PutCenterCallback(object):
 def axis(name="axis"):
     """
     DESCRIPTION
-      Puts coordinate axes to the lower left corner of the viewport.
+        Puts coordinate axes to the lower left corner of the viewport.
     USAGE
-      axis [ name ]
-    ARGUMENTS
-      name = str: ... {default: "axis"}
+        axis [ name ]
     """
     cmd.set("auto_zoom", 0)
     width = 0.06  # cylinder width
