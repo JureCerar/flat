@@ -20,7 +20,7 @@ def beautify(selection="all", mode=0):
     cmd.show("lines", f"((byres ({selection})) & (sc. | (n. CA | n. N & r. PRO)))")
     cmd.hide(f"({selection} and hydro and (e. C extend 1))")
     cmd.show("wire", f"{selection} and ! polymer.protein")
-    cmd.util.cbc()
+    # cmd.util.cbc()
     cmd.color("atomic", f"({selection}) and not elem C")
     return None
 
@@ -154,4 +154,9 @@ def axis(name="axis"):
     # Display
     PutCenterCallback(name, 1).load()
     cmd.load_cgo(obj, name)
+    return
+
+
+# https://raw.githubusercontent.com/Pymol-Scripts/Pymol-script-repo/master/Draw_Protein_Dimensions.py
+def dimensions():
     return
