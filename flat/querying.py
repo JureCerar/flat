@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-from pymol import cmd, CmdException
+from pymol import cmd, CmdException, cgo
 
 
 @cmd.extend
@@ -76,10 +75,10 @@ def length(selection="all", num=10):
 
 
 @cmd.extend
-def get_sasa(selection, state=0, dot_density=4, *, quiet=1):
+def get_sasa(selection, state=0, dot_density=4, *, quiet=1, _self=cmd):
     """
     DESCRIPTION
-        Get solvent accesible surface area.
+        Get solvent accesible surface area for selection.
     USAGE
         get_sasa selection [, state [, dot_density ]]
     """
@@ -121,9 +120,9 @@ def ext_coef(selection="all", state=-1, *, quiet=0):
     USAGE
         ext_coef [ selection [, state ]]
     LITERATURE
-        [1] C.N. Pace, et. al, Protein Sci., 1995, DOI: https://doi.org/10.1002/pro.5560041120
-        [2] H. Edelhoch, Biochemistry, 1967, DOI: https://doi.org/10.1021/bi00859a010
-        [3] C.G. Gill & P.H. von Hippel, Anal. Biochem., 1989, DOI: https://doi.org/10.1016/0003-2697(89)90602-7
+        C.N. Pace, et. al, Protein Sci., 1995, doi:10.1002/pro.5560041120
+        H. Edelhoch, Biochemistry, 1967, doi:10.1021/bi00859a010
+        C.G. Gill & P.H. von Hippel, Anal. Biochem., 1989, doi:10.1016/0003-2697(89)90602-7
     """
     state, quiet = int(state), int(quiet)
     nW = cmd.count_atoms(f"({selection}) & resn TRP & guide", state=state)
@@ -155,5 +154,91 @@ def ext_coef(selection="all", state=-1, *, quiet=0):
     return ((coef, abs), (coef0, abs0))
 
 
-# get_seq
-# https://github.com/speleo3/pymol-psico/blob/master/psico/modelling.py#L427
+@cmd.extend
+def get_seq(selection, chainbreak="/", unknown="X", *, _self=cmd):
+    """
+    DESCRIPTION
+        Gets the one-letter sequence, including residues without coordinates.
+    USAGE
+        get_seq selection [, chainbreak [, unknown ]]
+    """
+    # See: https://github.com/speleo3/pymol-psico/blob/master/psico/modelling.py#L427
+    seq_list = []
+    _self.iterate(
+        f"({selection}) & polymer",
+        "seq_list.append((resn, resv))",
+        space=locals(),
+    )
+
+    def seqbuilder():
+        from . import one_letter
+        prev_resv = None
+        for resn, resv in seq_list:
+            if resv != prev_resv:
+                if prev_resv is not None and resv != prev_resv + 1:
+                    yield chainbreak
+                if resn in one_letter:
+                    yield one_letter[resn]
+                else:
+                    print('Warning: unknown residue "%s"' % (resn))
+                    yield unknown
+                prev_resv = resv
+
+    return ''.join(seqbuilder())
+
+
+@cmd.extend
+def get_dipole(selection="all", state=0, var="partial_charge", vis=1, *, _self=cmd):
+    """
+    DESCRIPTION
+        Get electric dipole momentum for atoms in selection. For VAR use
+        either 'partial_charge' or 'formal_charge'. 
+    USAGE
+        get_dipole [ selection [, state [, var [, vis ]]]]
+    ARGUMENTS
+        selection = str: Atom selection {default: all}
+        state = int: Object state (0 for current state). {default: 0}
+        var = str: Propedrty used for calculation. {default: "partial_charge"}
+        vis = int: Visualize output. {default: 1}
+    """
+    import numpy as np
+    state, vis = int(state), int(vis)
+
+    bfact = []
+    cmd.iterate_state(state, selection, f"bfact.append({var})", space=locals())
+    com = np.array(cmd.centerofmass(selection, state))
+    xyz = np.array(cmd.get_coords(selection, state))
+
+    if not any(bfact) or len(bfact) == 0:
+       raise CmdException(f"Property '{var}' not assigned?")
+
+    dipole = np.zeros(3)
+    for i in range(len(xyz)):
+        dipole += bfact[i] * (xyz[i] - com)
+
+    dipole /= 0.2081943  # From [e*nm] to [D]
+
+    if vis:
+        color1 = cmd.get_color_tuple("red")
+        color2 = cmd.get_color_tuple("blue")
+
+        radius = 0.5
+        hlength = radius * 3.0
+        hradius = hlength * 0.6
+
+        vmin, vmax = cmd.get_extent(selection, state)
+        norm = np.linalg.norm(np.array(vmax) - np.array(vmin))
+        v = dipole / np.linalg.norm(dipole) * norm / 2
+
+        xyz1 = com - v
+        xyz2 = com + v
+        xyz3 = xyz2 + v / np.linalg.norm(v) * hlength
+
+        name = cmd.get_unused_name("dipole_moment")
+        obj = [cgo.CYLINDER, *xyz1, *xyz2, radius, *color1, *color2]
+        obj += [cgo.CONE, *xyz2, *xyz3, hradius,
+                0.0, *color2, *color2, 1.0, 0.0]
+
+        cmd.load_cgo(obj, name, state=state, zoom=1)
+
+    return dipole
