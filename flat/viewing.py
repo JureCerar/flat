@@ -1,10 +1,9 @@
-#!/usr/bin/env python3
 from pymol import cmd, cgo
-from chempy import cpv
+import numpy as np
 
 
 @cmd.extend
-def beautify(selection="all", mode=0):
+def beautify(selection="all", mode=0, *, _self=cmd):
     """
     DESCRIPTION
         Display molecules in pretty representation.
@@ -12,12 +11,15 @@ def beautify(selection="all", mode=0):
         beautify [ selection [, mode ]]
     ARGUMENTS
         selection = str: Atom selection. {default: all}
-        mode = int: ... {default: 0}
+        mode = int: Unused {default: 0}
     """
     mode = int(mode)
     cmd.hide("everything")
     cmd.show("cartoon", f"{selection} and polymer.protein")
-    cmd.show("lines", f"((byres ({selection})) & (sc. | (n. CA | n. N & r. PRO)))")
+    cmd.show(
+        "lines",
+        f"((byres ({selection})) & (sc. | (n. CA | n. N & r. PRO)))"
+    )
     cmd.hide(f"({selection} and hydro and (e. C extend 1))")
     cmd.show("wire", f"{selection} and ! polymer.protein")
     # cmd.util.cbc()
@@ -26,7 +28,7 @@ def beautify(selection="all", mode=0):
 
 
 @cmd.extend
-def filter(mode=1):
+def filter(mode=1, *, _self=cmd):
     """
     DESCRIPTION
         Apply different (instagram) filter to molecules for rendering.
@@ -113,8 +115,20 @@ class PutCenterCallback(object):
                 off_c[0] *= -1
             if self.corner in [3, 4]:
                 off_c[1] *= -1
-            off_m = cpv.transform(R_mc, off_c)
-            t = cpv.add(t, off_m)
+
+            off_m = [
+                R_mc[0][0]*off_c[0] + R_mc[0][1] *
+                off_c[1] + R_mc[0][2]*off_c[2],
+                R_mc[1][0]*off_c[0] + R_mc[1][1] *
+                off_c[1] + R_mc[1][2]*off_c[2],
+                R_mc[2][0]*off_c[0] + R_mc[2][1] *
+                off_c[1] + R_mc[2][2]*off_c[2],
+            ]
+            t = [
+                t[0] + off_m[0],
+                t[1] + off_m[1],
+                t[2] + off_m[2],
+            ]
 
         z = -v[11] / 30.0
         m = [
@@ -126,7 +140,7 @@ class PutCenterCallback(object):
 
 
 @cmd.extend
-def axis(name="axis"):
+def axis(name="axis", *, _self=cmd):
     """
     DESCRIPTION
         Puts coordinate axes to the lower left corner of the viewport.
@@ -154,9 +168,81 @@ def axis(name="axis"):
     # Display
     PutCenterCallback(name, 1).load()
     cmd.load_cgo(obj, name)
+
     return
 
 
-# https://raw.githubusercontent.com/Pymol-Scripts/Pymol-script-repo/master/Draw_Protein_Dimensions.py
-def dimensions():
-    return
+@cmd.extend
+def bounding_box(selection="all", state=0, vis=1, quiet=0, *, _self=cmd):
+    """
+    DESCRIPTION
+        Draws a bounding box around a given selection. 
+    USAGE
+        bounding_box [ selection [, state [, vis [, quiet ]]]]
+    """
+    state, vis, quiet = int(state), int(vis), int(quiet)
+
+    xyz = np.array(cmd.get_coords(selection, state)).T
+
+    # For what this vector magic is see reference bellow:
+    #  _notebooks/2021-04-20-3D-Oriented-Bounding-Box.ipynb
+    means = np.mean(xyz, axis=1)
+    cov = np.cov(xyz)
+    eval, evec = np.linalg.eig(cov)
+
+    centered_data = xyz - means[:, np.newaxis]
+    aligned_coords = np.matmul(evec.T, centered_data)
+
+    xmin, xmax = np.min(aligned_coords[0, :]), np.max(aligned_coords[0, :])
+    ymin, ymax = np.min(aligned_coords[1, :]), np.max(aligned_coords[1, :])
+    zmin, zmax = np.min(aligned_coords[2, :]), np.max(aligned_coords[2, :])
+
+    rectCoords = np.array([
+        [xmin, xmin, xmax, xmax, xmin, xmin, xmax, xmax],
+        [ymin, ymax, ymax, ymin, ymin, ymax, ymax, ymin],
+        [zmin, zmin, zmin, zmin, zmax, zmax, zmax, zmax]
+    ])
+
+    realigned_coords = np.matmul(evec, aligned_coords)
+    realigned_coords += means[:, np.newaxis]
+
+    bbox = np.matmul(evec, rectCoords)
+    bbox += means[:, np.newaxis]
+
+    result = [
+        np.linalg.norm(bbox[:, 4] - bbox[:, 7]),
+        np.linalg.norm(bbox[:, 3] - bbox[:, 7]),
+        np.linalg.norm(bbox[:, 6] - bbox[:, 7]),
+    ]
+
+    if not quiet:
+        print(" Bounding Box:", result, "A")
+
+    if vis:
+        linewidth = 2.00
+        color = cmd.get_color_tuple("yellow")
+        obj = [
+            cgo.LINEWIDTH, linewidth,
+            cgo.BEGIN, cgo.LINES,
+            cgo.COLOR, *color,
+            # z1 plane boundary
+            cgo.VERTEX, *bbox[:, 0], cgo.VERTEX, *bbox[:, 1],
+            cgo.VERTEX, *bbox[:, 1], cgo.VERTEX, *bbox[:, 2],
+            cgo.VERTEX, *bbox[:, 2], cgo.VERTEX, *bbox[:, 3],
+            cgo.VERTEX, *bbox[:, 3], cgo.VERTEX, *bbox[:, 0],
+            # z2 plane boundary
+            cgo.VERTEX, *bbox[:, 4], cgo.VERTEX, *bbox[:, 5],
+            cgo.VERTEX, *bbox[:, 5], cgo.VERTEX, *bbox[:, 6],
+            cgo.VERTEX, *bbox[:, 6], cgo.VERTEX, *bbox[:, 7],
+            cgo.VERTEX, *bbox[:, 7], cgo.VERTEX, *bbox[:, 4],
+            # z1 and z2 connecting boundaries
+            cgo.VERTEX, *bbox[:, 0], cgo.VERTEX, *bbox[:, 4],
+            cgo.VERTEX, *bbox[:, 1], cgo.VERTEX, *bbox[:, 5],
+            cgo.VERTEX, *bbox[:, 2], cgo.VERTEX, *bbox[:, 6],
+            cgo.VERTEX, *bbox[:, 3], cgo.VERTEX, *bbox[:, 7],
+            cgo.END
+        ]
+        name = cmd.get_unused_name("BoundingBox")
+        cmd.load_cgo(obj, name, zoom=0)
+
+    return  result
