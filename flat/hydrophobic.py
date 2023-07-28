@@ -2,8 +2,8 @@ from pymol import cmd, CmdException
 import collections
 import numpy as np
 
-HYDRO = collections.defaultdict(lambda: collections.defaultdict(float))
 
+HYDRO = collections.defaultdict(lambda: collections.defaultdict(float))
 # D. Bandyopadhyay, E.L. Mehler, Proteins, 2007, 72(2), 646–659. doi:10.1002/prot.21958 
 HYDRO["Bandyopadhyay-Methler"] = {
     "CYS":  1.15, "ILE":  0.97, "LEU":  0.87, "PHE":  0.85, "VAL":  0.83,
@@ -76,6 +76,7 @@ HYDRO["Eisenberg-dG"] = {
     "PHE":  2.30, "TRP":  2.60, "TYR":  1.60, "ASN": -0.60, "GLN": -0.22,
     "ASP": -1.20, "GLU": -0.67, "HIS":  0.64, "LYS": -0.57, "ARG": -2.10
 }
+
 
 @cmd.extend
 def get_hydro(selection="(all)", method="Black-Mould", vis=1, *, _self=cmd):

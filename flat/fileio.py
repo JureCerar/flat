@@ -1,4 +1,3 @@
-from pymol.exporting import _resn_to_aa as one_letter
 from pymol import cmd
 import collections
 import re
@@ -177,6 +176,8 @@ def save_colored_fasta(file, selection="all", invert=0, *, _self=cmd):
     """
     # See: https://github.com/speleo3/pymol-psico/blob/master/psico/fasta.py
     from pymol import Scratch_Storage
+    from pymol.exporting import _resn_to_aa as one_letter
+    
     invert = int(invert)
     selection = f"({selection}) and guide"
 

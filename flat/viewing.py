@@ -190,29 +190,29 @@ def bounding_box(selection="all", state=0, vis=1, quiet=0, *, _self=cmd):
     cov = np.cov(xyz)
     eval, evec = np.linalg.eig(cov)
 
-    centered_data = xyz - means[:, np.newaxis]
-    aligned_coords = np.matmul(evec.T, centered_data)
+    centered_xyz = xyz - means[:, np.newaxis]
+    aligned_xyz = np.matmul(evec.T, centered_xyz)
 
-    xmin, xmax = np.min(aligned_coords[0, :]), np.max(aligned_coords[0, :])
-    ymin, ymax = np.min(aligned_coords[1, :]), np.max(aligned_coords[1, :])
-    zmin, zmax = np.min(aligned_coords[2, :]), np.max(aligned_coords[2, :])
+    xmin, xmax = np.min(aligned_xyz[0, :]), np.max(aligned_xyz[0, :])
+    ymin, ymax = np.min(aligned_xyz[1, :]), np.max(aligned_xyz[1, :])
+    zmin, zmax = np.min(aligned_xyz[2, :]), np.max(aligned_xyz[2, :])
 
-    rectCoords = np.array([
+    box_xyz = np.array([
         [xmin, xmin, xmax, xmax, xmin, xmin, xmax, xmax],
         [ymin, ymax, ymax, ymin, ymin, ymax, ymax, ymin],
         [zmin, zmin, zmin, zmin, zmax, zmax, zmax, zmax]
     ])
 
-    realigned_coords = np.matmul(evec, aligned_coords)
+    realigned_coords = np.matmul(evec, aligned_xyz)
     realigned_coords += means[:, np.newaxis]
 
-    bbox = np.matmul(evec, rectCoords)
-    bbox += means[:, np.newaxis]
+    box = np.matmul(evec, box_xyz)
+    box += means[:, np.newaxis]
 
     result = [
-        np.linalg.norm(bbox[:, 4] - bbox[:, 7]),
-        np.linalg.norm(bbox[:, 3] - bbox[:, 7]),
-        np.linalg.norm(bbox[:, 6] - bbox[:, 7]),
+        np.linalg.norm(box[:, 4] - box[:, 7]),
+        np.linalg.norm(box[:, 3] - box[:, 7]),
+        np.linalg.norm(box[:, 6] - box[:, 7]),
     ]
 
     if not quiet:
@@ -226,20 +226,20 @@ def bounding_box(selection="all", state=0, vis=1, quiet=0, *, _self=cmd):
             cgo.BEGIN, cgo.LINES,
             cgo.COLOR, *color,
             # z1 plane boundary
-            cgo.VERTEX, *bbox[:, 0], cgo.VERTEX, *bbox[:, 1],
-            cgo.VERTEX, *bbox[:, 1], cgo.VERTEX, *bbox[:, 2],
-            cgo.VERTEX, *bbox[:, 2], cgo.VERTEX, *bbox[:, 3],
-            cgo.VERTEX, *bbox[:, 3], cgo.VERTEX, *bbox[:, 0],
+            cgo.VERTEX, *box[:, 0], cgo.VERTEX, *box[:, 1],
+            cgo.VERTEX, *box[:, 1], cgo.VERTEX, *box[:, 2],
+            cgo.VERTEX, *box[:, 2], cgo.VERTEX, *box[:, 3],
+            cgo.VERTEX, *box[:, 3], cgo.VERTEX, *box[:, 0],
             # z2 plane boundary
-            cgo.VERTEX, *bbox[:, 4], cgo.VERTEX, *bbox[:, 5],
-            cgo.VERTEX, *bbox[:, 5], cgo.VERTEX, *bbox[:, 6],
-            cgo.VERTEX, *bbox[:, 6], cgo.VERTEX, *bbox[:, 7],
-            cgo.VERTEX, *bbox[:, 7], cgo.VERTEX, *bbox[:, 4],
+            cgo.VERTEX, *box[:, 4], cgo.VERTEX, *box[:, 5],
+            cgo.VERTEX, *box[:, 5], cgo.VERTEX, *box[:, 6],
+            cgo.VERTEX, *box[:, 6], cgo.VERTEX, *box[:, 7],
+            cgo.VERTEX, *box[:, 7], cgo.VERTEX, *box[:, 4],
             # z1 and z2 connecting boundaries
-            cgo.VERTEX, *bbox[:, 0], cgo.VERTEX, *bbox[:, 4],
-            cgo.VERTEX, *bbox[:, 1], cgo.VERTEX, *bbox[:, 5],
-            cgo.VERTEX, *bbox[:, 2], cgo.VERTEX, *bbox[:, 6],
-            cgo.VERTEX, *bbox[:, 3], cgo.VERTEX, *bbox[:, 7],
+            cgo.VERTEX, *box[:, 0], cgo.VERTEX, *box[:, 4],
+            cgo.VERTEX, *box[:, 1], cgo.VERTEX, *box[:, 5],
+            cgo.VERTEX, *box[:, 2], cgo.VERTEX, *box[:, 6],
+            cgo.VERTEX, *box[:, 3], cgo.VERTEX, *box[:, 7],
             cgo.END
         ]
         name = cmd.get_unused_name("BoundingBox")
