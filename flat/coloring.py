@@ -1,50 +1,17 @@
 from pymol import cmd, menu
 
-# hould match the list in Color.cpp
-# See: https://github.com/schrodinger/pymol-open-source/blob/master/layer1/Color.cpp#L37
+# Custom color cycle (only 9 colors)
 _color_cycle = [
-    26,   # carbon
-    5,    # cyan
-    154,  # lightmagenta
-    6,    # yellow
-    9,    # salmon
-    29,   # hydrogen
-    11,   # slate
-    13,   # orange
-    10,   # lime
-    5262, # deepteal
-    12,   # hotpink
-    36,   # yelloworange
-    5271, # violetpurple
-    124,  # grey70
-    17,   # marine
-    18,   # olive
-    5270, # smudge
-    20,   # teal
-    5272, # dirtyviolet
-    52,   # wheat
-    5258, # deepsalmon
-    5274, # lightpink
-    5257, # aquamarine
-    5256, # paleyellow
-    15,   # limegreen
-    5277, # skyblue
-    5279, # warmpink
-    5276, # limon
-    53,   # violet
-    5278, # bluewhite
-    5275, # greencyan
-    5269, # sand
-    22,   # forest
-    5266, # lightteal
-    5280, # darksalmon
-    5267, # splitpea
-    5268, # raspberry
-    104,  # grey50
-    23,   # deepblue
-    51,   # brown
+    "0x3ec692", # green
+    "0x4c94fc", # blue
+    "0xf5a566", # orange
+    "0xe05658", # red
+    "0xfbda42", # yellow 
+    "0xd870ba", # pink
+    "0x5c5d5c", # dark
+    "0x3fb8c9", # cyan
+    "0xaa6fda", # purple
 ]
-
 
 @cmd.extend
 def cbc(selection="(all)"):
@@ -58,7 +25,7 @@ def cbc(selection="(all)"):
         if len(chain.split()) != 1:
             chain = f"'{chain}'"
         color = _color_cycle[i % len(_color_cycle)]
-        cmd.color(color, f"(e. C & c. {chain} & ({selection}))")
+        cmd.color(color, f"(({selection}) & {chain} & e. C)")
     return
 
 
@@ -78,23 +45,39 @@ def cbe(selection="(all)", *, _self=cmd, **kwargs):
 
 
 @cmd.extend
-def cbattr(selection="(all)"):
+def cbattr(selection="(all)", negative=0, positive=0, polar=0, nonpolar=0, special=0, *, _self=cmd):
     """
     DESCRIPTION
         Color by residue by attribute.
     USAGE
-        cbattr [ selection ]
+        cbattr [ selection [, attribute ]]
     """
-    negative = ["ASP", "GLU"]
-    positive = ["ARG", "HIS", "LYS"]
-    hydrophobic = ["ALA", "ILE", "LEU", "MET", "PHE", "TRP", "TYR", "VAL"]
-    hydrophilic = ["ASN", "GLN", "SER", "THR"]
-    special = ["CYS", "GLY", "PRO"]
-    cmd.color("red", f"({selection}) & resn {'+'.join(negative)}")
-    cmd.color("marine", f"({selection}) & resn {'+'.join(positive)}")
-    cmd.color("orange", f"({selection}) & resn {'+'.join(hydrophobic)}")
-    cmd.color("green", f"({selection}) & resn {'+'.join(hydrophilic)}")
-    cmd.color("gray", f"({selection}) & resn {'+'.join(special)}")
+    negative = int(negative)
+    positive = int(positive)
+    polar = int(polar)
+    nonpolar = int(nonpolar)
+    special = int(special)
+
+    if not any([negative, positive, polar, nonpolar, special]):
+        negative, positive, polar, nonpolar, special = 1, 1, 1, 1, 1
+
+    _res_negative = ["ASP", "GLU"]
+    _res_positive = ["ARG", "HIS", "LYS"]
+    _res_polar = ["ASN", "GLN", "SER", "THR"]
+    _res_nonpolar = ["ALA", "ILE", "LEU", "MET", "PHE", "TRP", "TYR", "VAL"]
+    _res_special = ["CYS", "GLY", "PRO"]
+
+    if negative:
+        cmd.color("red", f"({selection}) & resn {'+'.join(_res_negative)}")
+    if positive:
+        cmd.color("marine", f"({selection}) & resn {'+'.join(_res_positive)}")
+    if polar:
+        cmd.color("tv_green", f"({selection}) & resn {'+'.join(_res_polar)}")
+    if nonpolar:
+        cmd.color("yellow", f"({selection}) & resn {'+'.join(_res_nonpolar)}")
+    if special:
+        cmd.color("gray", f"({selection}) & resn {'+'.join(_res_special)}")
+
     return
 
 
@@ -134,6 +117,30 @@ class _Colors():
 
 # Color palettes. PyMOL API only
 palette = _Palette()
+
+# Custom colors
+cmd.set_color("my_green", [62, 198, 146])
+cmd.set_color("my_blue", [76, 148, 252])
+cmd.set_color("my_orange", [245, 165, 102])
+cmd.set_color("my_red", [224, 86, 88])
+cmd.set_color("my_yellow", [251, 218, 66])
+cmd.set_color("my_pink", [216, 112, 186])
+cmd.set_color("my_dark", [92, 93, 92])
+cmd.set_color("my_cyan", [63, 184, 201])
+cmd.set_color("my_purple", [170, 111, 218])
+menu.all_colors_list.append(
+    ("custom", [
+        ("275", "my_green"),
+        ("259", "my_blue"),
+        ("963", "my_orange"),
+        ("833", "my_red"),
+        ("982", "my_yellow"),
+        ("847", "my_pink"),
+        ("333", "my_dark"),
+        ("277", "my_cyan"),
+        ("648", "my_purple"),
+    ]),
+)
 
 # Novartis colors
 palette.novartis = _Colors("novartis", "carmine", "sienna", "apricot")
