@@ -11,20 +11,19 @@ def beautify(selection="all", mode=0, *, _self=cmd):
         beautify [ selection [, mode ]]
     ARGUMENTS
         selection = str: Atom selection. {default: all}
-        mode = int: Unused {default: 0}
+        mode = int: Display mode. {default: 0}
     """
     mode = int(mode)
-    cmd.hide("everything")
+    cmd.hide("everything", selection)
+    cmd.show("wire", f"{selection} and ! polymer.protein")
     cmd.show("cartoon", f"{selection} and polymer.protein")
     cmd.show(
-        "lines",
+        ["licorice", "line"][mode],
         f"((byres ({selection})) & (sc. | (n. CA | n. N & r. PRO)))"
     )
     cmd.hide(f"({selection} and hydro and (e. C extend 1))")
-    cmd.show("wire", f"{selection} and ! polymer.protein")
-    # cmd.util.cbc()
-    cmd.color("atomic", f"({selection}) and not elem C")
-    return None
+    cmd.color("atomic", f"({selection}) and ! e. C")
+    return
 
 
 @cmd.extend
@@ -173,14 +172,15 @@ def axis(name="axis", *, _self=cmd):
 
 
 @cmd.extend
-def bounding_box(selection="all", state=0, vis=1, quiet=0, *, _self=cmd):
+def bounding_box(selection="all", state=0, vis=1, color="yellow", quiet=0, *, _self=cmd):
     """
     DESCRIPTION
         Draws a bounding box around a given selection. 
     USAGE
-        bounding_box [ selection [, state [, vis [, quiet ]]]]
+        bounding_box [ selection [, state [, vis [, color [, quiet ]]]]]
     """
     state, vis, quiet = int(state), int(vis), int(quiet)
+    rgb = cmd.get_color_tuple(color)
 
     xyz = np.array(cmd.get_coords(selection, state)).T
 
@@ -220,11 +220,10 @@ def bounding_box(selection="all", state=0, vis=1, quiet=0, *, _self=cmd):
 
     if vis:
         linewidth = 2.00
-        color = cmd.get_color_tuple("yellow")
         obj = [
             cgo.LINEWIDTH, linewidth,
             cgo.BEGIN, cgo.LINES,
-            cgo.COLOR, *color,
+            cgo.COLOR, *rgb,
             # z1 plane boundary
             cgo.VERTEX, *box[:, 0], cgo.VERTEX, *box[:, 1],
             cgo.VERTEX, *box[:, 1], cgo.VERTEX, *box[:, 2],
