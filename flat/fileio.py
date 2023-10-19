@@ -1,47 +1,108 @@
-from pymol import cmd
+from pymol import cmd, CmdException
 import collections
 import re
 
 
 @cmd.extend
-def save_bfact(file, selection="(all)", var="b", *, _self=cmd):
+def save_bfact(file, selection="(all)", var="b", mode="atom", *, _self=cmd):
     """
     DESCRIPTION
         Save property from selection to CSV file.
     USAGE
-        saveBfact file [, selection [, var ]]
+        save_bfact file [, selection [, var [, mode ]]]
+    ARGUMENTS
+        file = str: Output file name.
+        selection = str: Atom selection. {default: all}
+        var = str: Property to save. {default: b}
+        mode = str: Iterator mode: atom or res. {default: "atom"}
     """
+    if len(_self.get_object_list(selection)) > 1:
+        raise CmdException("Multiple objects in selection.")
+
     bfact = []
-    _self.iterate(
-        selection,
-        "bfact.append([model,segi,chain,resn,resi,name,{}])".format(var),
-        space=locals(),
-    )
+    if mode.lower() == "atom":
+        # Iterate by atoms
+        bfact.append(["chain", "resn", "resi", "name", "value"])
+        _self.iterate(
+            selection,
+            "bfact.append([chain,resn,resi,name,{}])".format(var),
+            space=locals(),
+        )
+    elif mode.lower() == "res":
+        # Iterate by residues
+        bfact.append(["chain", "resn", "resi", "value"])
+        _self.iterate(
+            f"bca. ({selection})",
+            "bfact.append([chain,resn,resi,{}])".format(var),
+            space=locals(),
+        )
+    else:
+        raise CmdException(f"Invalid mode: '{mode}'")
+
     with open(file, "w") as handle:
         for b in bfact:
             print(*b, sep=",", file=handle)
+
     return
 
 
 @cmd.extend
-def load_bfact(file, selection="(all)", var="b", *, _self=cmd):
+def load_bfact(file, selection="(all)", var="b", vis=1, *, _self=cmd):
     """
     DESCRIPTION
-        Load property to selection from CSV file.
+        Load property from CSV file to selection.
     USAGE
-        loadBfact file [, selection [, var ]]
+        load_bfact file [, selection [, var [, vis ]]]
+    ARGUMENTS
+        file = str: Input file name.
+        selection = str: Atom selection. {default: all}
+        var = str: Property to save. {default: b}
+        vis = int: Visualize output. {default: 1}
     """
-    vis = int(vis)
-    bfact = collections.defaultdict()
-    for line in open(file, "r"):
-        col = line.split(",")
-        key, val = col[:-1], col[-1]
-        bfact[key] = val
-    _self.alter(
-        selection,
-        "{} = bfact[model,segi,chain,resn,resi,name]".format(var),
-        space=locals()
-    )
+    vis = bool(vis)
+    if len(_self.get_object_list(selection)) > 1:
+        raise CmdException("Multiple objects in selection.")
+
+    bfact = collections.defaultdict(float)
+    with open(file, "r") as handle:
+        # From header try to guess CSV format
+        col = handle.readline().split(",")
+        if len(col) == 5:
+            mode = "atom"
+        elif len(col) == 4:
+            mode = "res"
+        else:
+            raise CmdException("Cannot determine CSV file format from header")
+
+        # Read the data from the rest of the file
+        for line in handle:
+            col = line.strip().split(",")
+            key, val = tuple(col[:-1]), col[-1]
+            bfact[key] = float(val)
+
+    if mode == "atom":
+        # Set property by atom
+        _self.alter(
+            selection,
+            "{} = bfact[chain,resn,resi,name]".format(var),
+            space=locals(),
+        )
+    elif mode == "res":
+        # Set property by residues
+        _self.alter(
+            selection,
+            "{} = bfact[chain,resn,resi]".format(var),
+            space=locals(),
+        )
+
+    # Visualize the property
+    if vis:
+        palette = ["marine", "silver", "red"]
+        obj = _self.get_object_list(selection)[0]
+        vmin, vmax = min(bfact.values()), max(bfact.values())
+        _self.spectrum(var, " ".join(palette), selection, vmin, vmax)
+        _self.ramp_new("ramp", obj, [vmin, vmax], palette)
+
     return
 
 
@@ -177,7 +238,7 @@ def save_colored_fasta(file, selection="all", invert=0, *, _self=cmd):
     # See: https://github.com/speleo3/pymol-psico/blob/master/psico/fasta.py
     from pymol import Scratch_Storage
     from pymol.exporting import _resn_to_aa as one_letter
-    
+
     invert = int(invert)
     selection = f"({selection}) and guide"
 
@@ -203,7 +264,7 @@ def save_colored_fasta(file, selection="all", invert=0, *, _self=cmd):
             background = ""
         elif invert:
             cs = round((rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000)
-            color = "black" if cs > 125 else "white" 
+            color = "black" if cs > 125 else "white"
             background = "background-color:#{:02x}{:02x}{:02x}".format(*rgb)
         else:
             color = "#{:02x}{:02x}{:02x}".format(*rgb)
