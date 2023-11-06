@@ -4,7 +4,7 @@ import sys
 
 
 @cmd.extend
-def renumber(selection, start=1, quiet=False):
+def renumber(selection, start=1, quiet=False, *, _self=cmd):
     """
     DESCRIPTION
         Renumber sets new residue numbers (resi) for a polymer based on connectivity. 
@@ -14,10 +14,10 @@ def renumber(selection, start=1, quiet=False):
     """
     # See: https://pymolwiki.org/index.php/Renumber
     start, quiet = int(start), bool(quiet)
-    model = cmd.get_model(selection)
+    model = _self.get_model(selection)
     limit = sys.getrecursionlimit()
     sys.setrecursionlimit(10**5)
-    cmd.iterate(
+    _self.iterate(
         selection,
         "next(atom_it).model = model",
         space={
@@ -53,7 +53,7 @@ def renumber(selection, start=1, quiet=False):
         return
 
     traverse(startatom, start)
-    cmd.alter(
+    _self.alter(
         selection,
         "resi = next(atom_it).resi",
         space={
@@ -78,28 +78,30 @@ def relax(selection, backbone=1, neighbors=1, cycles=100, state=0, *, _self=cmd)
     backbone, neighbors,  = int(backbone), int(neighbors)
     cycles, state = int(cycles), int(state)
 
-    obj = cmd.get_object_list(selection)[0]
+    if not _self.get_object_list(selection):
+        raise CmdException(f"Empty selection: {selection}")
+    obj = _self.get_object_list(selection)[0]
 
-    cmd.protect()
-    cmd.deprotect(selection)
+    _self.protect()
+    _self.deprotect(selection)
     if not backbone:
-        cmd.protect("name CA+C+N+O+OXT")
+        _self.protect("name CA+C+N+O+OXT")
     if neighbors:
-        cmd.deprotect(f"byres ({obj} within 6.0 of ({selection}))")
+        _self.deprotect(f"byres ({obj} within 6.0 of ({selection}))")
 
-    cmd.sculpt_activate(obj, state)
+    _self.sculpt_activate(obj, state)
 
-    cmd.set("sculpt_vdw_weight", 0.25, obj)  # Low VDW forces
-    cmd.set("sculpt_field_mask", 0x1FF, obj)  # Default
-    cmd.sculpt_iterate(obj, state, int(cycles * 0.75))
+    _self.set("sculpt_vdw_weight", 0.25, obj)  # Low VDW forces
+    _self.set("sculpt_field_mask", 0x1FF, obj)  # Default
+    _self.sculpt_iterate(obj, state, int(cycles * 0.75))
 
-    cmd.set("sculpt_field_mask", 0x01F, obj)  # Local Geometry Only
-    cmd.sculpt_iterate(obj, state, int(cycles * 0.25))
+    _self.set("sculpt_field_mask", 0x01F, obj)  # Local Geometry Only
+    _self.sculpt_iterate(obj, state, int(cycles * 0.25))
 
-    cmd.unset("sculpt_vdw_weight", obj)
-    cmd.unset("sculpt_field_mask", obj)
-    cmd.sculpt_deactivate(obj)
-    cmd.deprotect()
+    _self.unset("sculpt_vdw_weight", obj)
+    _self.unset("sculpt_field_mask", obj)
+    _self.sculpt_deactivate(obj)
+    _self.deprotect()
 
     return
 
@@ -118,79 +120,84 @@ def graft(mobile, target, out=None, sculpt=1, cycles=100, *, _self=cmd):
         out = string: output structure name {default: None}
         minimize = str: Do a short minimization of grafted structure {default: True}
     """
-    sculpt, cylces = str(sculpt), str(cycles)
+    sculpt, cycles = int(sculpt), int(cycles)
 
-    if len(cmd.get_chains(mobile)) != 1:
+    if len(_self.get_chains(mobile)) != 1:
         raise CmdException("Mobile selection must contain only one chain")
 
-    if len(cmd.get_chains(target)) != 1:
+    if len(_self.get_chains(target)) != 1:
         raise CmdException("Target selection must contain only one chain")
 
-    _mobile = cmd.get_unused_name("mobile")
-    cmd.copy_to(_mobile, mobile, rename="", zoom=0)
-    mobile_len = len(cmd.get_model(_mobile).get_residues())
+    _mobile = _self.get_unused_name("mobile")
+    _self.copy_to(_mobile, mobile, rename="", zoom=0)
+    mobile_len = len(_self.get_model(_mobile).get_residues())
 
-    _target = cmd.get_unused_name("target")
-    cmd.copy_to(_target, target, rename="", zoom=0)
-    target_len = len(cmd.get_model(_target).get_residues())
+    _target = _self.get_unused_name("target")
+    _self.copy_to(_target, target, rename="", zoom=0)
+    target_len = len(_self.get_model(_target).get_residues())
 
     # Clean-up mobile section; chain and segi must match target section.
-    model = cmd.get_model(_target)
+    model = _self.get_model(_target)
     chain, segi = model.atom[0].chain, model.atom[0].segi
-    cmd.alter(_mobile, f"chain='{chain}'; segi='{segi}'")
-    cmd.remove(f"{_mobile} & name OXT")
+    _self.alter(_mobile, f"chain='{chain}'; segi='{segi}'")
+    _self.remove(f"{_mobile} & name OXT")
 
-    # Aligment method "cealign" method works best for this use
-    cmd.extra_fit(_mobile, _target, "cealign",
-                  mobile_state=-1, target_state=-1)
-    align = cmd.get_unused_name("align")
-    score = cmd.align(_mobile, _target, quiet=0, object=align)
+    # Alignment method "cealign" method works best for this use
+    _self.extra_fit(
+        _mobile,
+        _target,
+        "cealign",
+        mobile_state=-1,
+        target_state=-1
+    )
+    align = _self.get_unused_name("align")
+    score = _self.align(_mobile, _target, quiet=0, object=align)
     if score[0] > 100.0:
-        raise Warning("RMSD value is high. Are you sure this is correct aligment?")
+        raise Warning("RMSD value is high. Are you sure this is correct alignment?")
 
     # Renumber target and mobile to correct numbering
-    model = cmd.get_model(f"{align} & {_target}")
+    model = _self.get_model(f"{align} & {_target}")
     first, last = int(model.atom[0].resi), int(model.atom[-1].resi)
 
     if not out:
-        out = cmd.get_unused_name("out")
+        out = _self.get_unused_name("out")
     renumber(_mobile, start=first)
-    cmd.copy_to(out, _mobile, rename="", zoom=0)
+    _self.copy_to(out, _mobile, rename="", zoom=0)
 
     # Split target section into left and right objects.
     # Correctly renumber objects and then combine/join them.
     # Do a energy minimization around newly bonded sections.
     if first > 1:
-        target_left = cmd.get_unused_name("target_left")
-        cmd.select(target_left, f"{_target} & resi 1-{first-1}")
+        target_left = _self.get_unused_name("target_left")
+        _self.select(target_left, f"{_target} & resi 1-{first-1}")
         renumber(target_left, start=1)
-        cmd.copy_to(out, target_left, rename="", zoom=0)
-        cmd.bond(
+        _self.copy_to(out, target_left, rename="", zoom=0)
+        _self.bond(
             f"/{out}///{first-1}/C",
             f"/{out}///{first}/N",
         )
-        cmd.delete(target_left)
+        _self.delete(target_left)
         if sculpt:
-            relax(f"{out} & resi {first}-{first-1}", 1, 1, cycles)
+            relax(f"{out} & resi {first-1}-{first}", 1, 1, cycles)
 
     if last < target_len:
-        target_right = cmd.get_unused_name("target_right")
-        cmd.select(target_right, f"{_target} & resi {last+1}-{target_len}")
-        nbond = first+mobile_len
-        renumber(target_right, start=nbond)
-        cmd.copy_to(out, target_right, rename="", zoom=0)
-        cmd.bond(
-            f"/{out}///{nbond-1}/C",
-            f"/{out}///{nbond}/N",
+        target_right = _self.get_unused_name("target_right")
+        _self.select(target_right, f"{_target} & resi {last+1}-{target_len}")
+        resi = first + mobile_len
+        renumber(target_right, start=resi)
+        _self.copy_to(out, target_right, rename="", zoom=0)
+        _self.bond(
+            f"/{out}///{resi-1}/C",
+            f"/{out}///{resi}/N",
         )
-        cmd.delete(target_right)
+        _self.delete(target_right)
         if sculpt:
-            relax(f"{out} & resi {nbond-1}-{nbond}", 1, 1, cycles)
+            relax(f"{out} & resi {resi-1}-{resi}", 1, 1, cycles)
 
     # Clean-up objects (in order they were created)
-    cmd.delete(_mobile)
-    cmd.delete(_target)
-    cmd.delete(align)
+    _self.delete(_mobile)
+    _self.delete(_target)
+    _self.delete(align)
 
     return
 
@@ -199,32 +206,42 @@ def graft(mobile, target, out=None, sculpt=1, cycles=100, *, _self=cmd):
 def mutate(selection, residue, sculpt=0, cycles=100, *, _self=cmd):
     """
     DESCRIPTION
-        Mutate a single residue and select best rotamer. Can do some
-        scultiong at the end to best rotamer.
+        Mutate a single residue and select best rotamer. Optionally
+        fit lowest energy mutant rotamer to structure.
     USAGE
         mutate selection, residue [, sculpt [, cycles ]]
     """
-    sculpt = int(sculpt)
+    sculpt, cycles = int(sculpt), int(cycles)
+
+    three_letter = {
+        "A": "ALA", "C": "CYS", "E": "GLU", "D": "ASP", "G": "GLY", "F": "PHE",
+        "I": "ILE", "H": "HIS", "K": "LYS", "M": "MET", "L": "LEU", "N": "ASN",
+        "Q": "GLN", "P": "PRO", "S": "SER", "R": "ARG", "T": "THR", "W": "TRP",
+        "V": "VAL", "Y": "TYR",
+        }
     
-    if len(cmd.get_model(selection).get_residues()) != 1:
+    if len(_self.get_model(selection).get_residues()) != 1:
         raise CmdException("Multiple residues in selection.")
 
-    try:
-        cmd.wizard("mutagenesis")
-        cmd.do("refresh_wizard")
-        cmd.get_wizard().set_mode(residue.upper())
-        cmd.get_wizard().do_select(f"byres ({selection})")
+    if len(residue) == 1:
+        residue = three_letter.get(residue, residue)
 
-        scores = cmd.get_wizard().bump_scores
+    try:
+        _self.wizard("mutagenesis")
+        _self.do("refresh_wizard")
+        _self.get_wizard().set_mode(residue.upper())
+        _self.get_wizard().do_select(f"byres ({selection})")
+
+        scores = _self.get_wizard().bump_scores
         if scores:
             frame = scores.index(min(scores)) + 1
         else:
             frame = 1
-        cmd.frame(str(frame))
-        cmd.get_wizard().apply()
+        _self.frame(str(frame))
+        _self.get_wizard().apply()
 
     finally:
-        cmd.set_wizard()
+        _self.set_wizard()
 
     if sculpt > 0:
         relax(selection, 1, 1, cycles)
@@ -242,33 +259,33 @@ def insert(selection, fragment, sculpt=0, cycles=100, *, _self=cmd):
     """
     sculpt, cycles = int(sculpt), int(cycles)
 
-    if len(cmd.get_model(selection).get_residues()) != 1:
+    if len(_self.get_model(selection).get_residues()) != 1:
         raise CmdException("Multiple residues in selection.")
-    if len(cmd.get_model(fragment).get_residues()) != 1:
+    if len(_self.get_model(fragment).get_residues()) != 1:
         raise CmdException("Multiple residues in fragment.")
 
-    temp = cmd.get_unused_name("_tmp")
-    cmd.create(temp, fragment, source_state=1, target_state=1)
+    temp = _self.get_unused_name("_tmp")
+    _self.create(temp, fragment, source_state=1, target_state=1)
 
-    model = cmd.get_object_list(selection)[0]
-    at = cmd.get_model(selection).atom[0]
+    model = _self.get_object_list(selection)[0]
+    at = _self.get_model(selection).atom[0]
     segi, chain, resi = at.segi, at.chain, int(at.resi)
-    cmd.alter(temp, f"segi,chain,resi='{segi}','{chain}',{resi}")
+    _self.alter(temp, f"segi,chain,resi='{segi}','{chain}',{resi}")
 
-    cmd.align(
+    _self.align(
         mobile=f"({temp}) & n. O+C+N",
         target=f"({selection}) & n. O+C+N",
     )
 
-    cmd.remove(selection)
-    cmd.fuse(model, temp, mode=3)
-    cmd.edit()
+    _self.remove(selection)
+    _self.fuse(model, temp, mode=3)
+    _self.edit()
 
-    cmd.bond(
+    _self.bond(
         atom1=f"/{model}/{segi}/{chain}/`{resi-1}/C",
         atom2=f"/{model}/{segi}/{chain}/`{resi}/N",
     )
-    cmd.bond(
+    _self.bond(
         atom1=f"/{model}/{segi}/{chain}/`{resi}/C",
         atom2=f"/{model}/{segi}/{chain}/`{resi+1}/N",
     )
@@ -314,7 +331,7 @@ def add_missing_atoms(selection, sculpt=0, cycles=100, *, _self=cmd):
     }
 
     namelists = collections.defaultdict(list)
-    cmd.iterate(
+    _self.iterate(
         f"({selection}) & polymer",
         "namelists[model,segi,chain,resn,resi].append(name)",
         space=locals()
@@ -329,19 +346,19 @@ def add_missing_atoms(selection, sculpt=0, cycles=100, *, _self=cmd):
 
         if not reference[resn].issubset(namelist):
             try:
-                cmd.wizard("mutagenesis")
-                cmd.do("refresh_wizard")
-                cmd.get_wizard().set_mode(resn)
+                _self.wizard("mutagenesis")
+                _self.do("refresh_wizard")
+                _self.get_wizard().set_mode(resn)
                 sele = "/{}/{}/{}/{}`{}".format(*key)
-                cmd.get_wizard().do_select(sele)
-                scores = cmd.get_wizard().bump_scores
+                _self.get_wizard().do_select(sele)
+                scores = _self.get_wizard().bump_scores
                 if scores:
                     frame = scores.index(min(scores)) + 1
                 else:
                     frame = 1
-                cmd.frame(str(frame))
-                cmd.get_wizard().apply()
-                sele_list.appennd(sele)
+                _self.frame(str(frame))
+                _self.get_wizard().apply()
+                sele_list.append(sele)
                 # if not quiet:
                 #     print(f"Mutated: {sele}")
 
@@ -349,7 +366,7 @@ def add_missing_atoms(selection, sculpt=0, cycles=100, *, _self=cmd):
                 print(f"Mutating '{sele}' failed: {ex}")
 
             finally:
-                cmd.set_wizard()
+                _self.set_wizard()
 
     if sculpt:
         for sele in sele_list:
