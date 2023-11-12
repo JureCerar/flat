@@ -1,25 +1,100 @@
-from pymol import cmd
+from pymol import cmd, CmdException
 import textwrap
 
-one_letter = {
-    "ALA": "A", "ARG": "R", "ASN": "N", "ASP": "D", "CYS": "C", "GLN": "Q", "GLU": "E",
-    "GLY": "G", "HIS": "H", "ILE": "I", "LEU": "L", "LYS": "K", "MET": "M", "PHE": "F",
-    "PRO": "P", "SER": "S", "THR": "T", "TRP": "W", "TYR": "Y", "VAL": "V"
-}
+@cmd.extend
+def save_csv(filename, selection="(all)", var="b", mode="atom", quiet=1, *, _self=cmd):
+    """
+    DESCRIPTION
+        Save property from selection to CSV file.
+    USAGE
+        save_csv file [, selection [, var [, mode ]]]
+    ARGUMENTS
+        file = str: Output file name.
+        selection = str: Atom selection. {default: all}
+        var = str: Property to save. {default: b}
+        mode = str: Iterator mode: atom or res. {default: "atom"}
+    """
+    if len(_self.get_object_list(selection)) > 1:
+        raise CmdException("Multiple objects in selection.")
+
+    data = []
+    if mode.lower() == "atom":
+        # Iterate by atoms
+        data.append(["chain", "resn", "resi", "name", "value"])
+        _self.iterate(
+            selection,
+            "data.append([chain, resn, resi, name, {}])".format(var),
+            space=locals(),
+        )
+
+    elif mode.lower() == "res":
+        # Iterate by residues
+        data.append(["chain", "resn", "resi", "value"])
+        _self.iterate(
+            f"bca. ({selection})",
+            "data.append([chain, resn, resi, {}])".format(var),
+            space=locals(),
+        )
+
+    else:
+        raise CmdException(f"Invalid mode: '{mode}'")
+
+    with open(filename, "w") as f:
+        for line in data:
+            print(*line, sep=",", file=f)
+
+    if not int(quiet):
+        print(f'Save: wrote "{filename}"')
+
+    return
+
+
+@cmd.extend
+def save_ndx(filename, quiet=0, *, _self=cmd):
+    """
+    DESCRIPTION
+        Save all selections as GROMACS index (.ndx) file.
+    USAGE
+        save_ndx filename [, quiet ]]
+    """
+    quiet = int(quiet)
+
+    selections = cmd.get_names("public_selections")
+    groups = dict()
+
+    for name in selections:
+        groups[name] = list()
+        cmd.iterate(name, "group.append(index)", space={"group": groups[name]})
+
+    with open(filename, "w") as handle:
+        nlines = 15  # Number of indeces per line
+        for name, group in groups.items():
+            if not quiet:
+                print(f"Saving group: '{name}' len(group atoms)")
+            print(f"[ {name} ]", file=handle)
+            for i in range(0, len(group), nlines):
+                print(
+                    " ".join(f"{x:5}" for x in group[i:i+nlines]), file=handle)
+
+    return
+
 
 @cmd.extend
 def get_pir(selection='(all)', state=-1, *, _self=cmd):
-    # Default PIR settings
-    chainbreak = "/"
-    unknown = "-"
-    width = 75
-
+    """
+    DESCRIPTION
+        Get sequence or sequence alignment in PIR format.
+    USAGE
+        get_pir [selection]
+    """
+    from pymol.exporting import _resn_to_aa as one_letter
+    
     # Get list of molecular objects
     objects = _self.get_names("public_objects", 0, selection)
     objects = [_ for _ in objects if _self.get_type(obj) == "object:molecule"]
     
     buffer = []
-    for num, obj in enumerate(objects):
+    for obj in objects:
         # Extract info from model
         mdl = cmd.get_model(f"bca. {obj} & polymer")
         resn = [a.resn for a in mdl.atom]
@@ -28,7 +103,7 @@ def get_pir(selection='(all)', state=-1, *, _self=cmd):
 
         # Construct header and info lines
         buffer.append("")
-        buffer.append(f">P{num + 1};{obj}")
+        buffer.append(f">P1;{obj}")
         buffer.append(
             f"structureX:{obj}:{resi[0]}:{chain[0]}:{resi[-1]}:{chain[-1]}:::-1.00:-1.00"
         )
@@ -39,18 +114,20 @@ def get_pir(selection='(all)', state=-1, *, _self=cmd):
         for name, i in zip(resn, resi):
             if i != prev:
                 if prev is not None and i != prev + 1:
-                    seq += chainbreak
+                    seq += "/" # Chain break
                 else:
-                    seq += one_letter.get(name, unknown)
+                    seq += one_letter.get(name, "-")
                 prev = i
         seq += "*"
-        buffer += textwrap.wrap(seq, width)
+        buffer += textwrap.wrap(seq, 75)
 
     return "\n".join(buffer)
 
 
 try:
     from pymol.exporting import savefunctions
+    savefunctions.setdefault("csv", save_csv)
+    savefunctions.setdefault("ndx", save_ndx)
     savefunctions.setdefault("pir", get_pir)
 except ImportError:
     pass

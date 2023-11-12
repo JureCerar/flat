@@ -4,57 +4,14 @@ import re
 
 
 @cmd.extend
-def save_bfact(file, selection="(all)", var="b", mode="atom", *, _self=cmd):
-    """
-    DESCRIPTION
-        Save property from selection to CSV file.
-    USAGE
-        save_bfact file [, selection [, var [, mode ]]]
-    ARGUMENTS
-        file = str: Output file name.
-        selection = str: Atom selection. {default: all}
-        var = str: Property to save. {default: b}
-        mode = str: Iterator mode: atom or res. {default: "atom"}
-    """
-    if len(_self.get_object_list(selection)) > 1:
-        raise CmdException("Multiple objects in selection.")
-
-    bfact = []
-    if mode.lower() == "atom":
-        # Iterate by atoms
-        bfact.append(["chain", "resn", "resi", "name", "value"])
-        _self.iterate(
-            selection,
-            "bfact.append([chain,resn,resi,name,{}])".format(var),
-            space=locals(),
-        )
-    elif mode.lower() == "res":
-        # Iterate by residues
-        bfact.append(["chain", "resn", "resi", "value"])
-        _self.iterate(
-            f"bca. ({selection})",
-            "bfact.append([chain,resn,resi,{}])".format(var),
-            space=locals(),
-        )
-    else:
-        raise CmdException(f"Invalid mode: '{mode}'")
-
-    with open(file, "w") as handle:
-        for b in bfact:
-            print(*b, sep=",", file=handle)
-
-    return
-
-
-@cmd.extend
-def load_bfact(file, selection="(all)", var="b", vis=1, *, _self=cmd):
+def load_csv(filename, selection="(all)", var="b", vis=0, *, _self=cmd):
     """
     DESCRIPTION
         Load property from CSV file to selection.
     USAGE
-        load_bfact file [, selection [, var [, vis ]]]
+        load_csv filename [, selection [, var [, vis ]]]
     ARGUMENTS
-        file = str: Input file name.
+        filename = str: Input file name.
         selection = str: Atom selection. {default: all}
         var = str: Property to save. {default: b}
         vis = int: Visualize output. {default: 1}
@@ -63,8 +20,8 @@ def load_bfact(file, selection="(all)", var="b", vis=1, *, _self=cmd):
     if len(_self.get_object_list(selection)) > 1:
         raise CmdException("Multiple objects in selection.")
 
-    bfact = collections.defaultdict(float)
-    with open(file, "r") as handle:
+    data = collections.defaultdict(float)
+    with open(filename, "r") as handle:
         # From header try to guess CSV format
         col = handle.readline().split(",")
         if len(col) == 5:
@@ -78,20 +35,20 @@ def load_bfact(file, selection="(all)", var="b", vis=1, *, _self=cmd):
         for line in handle:
             col = line.strip().split(",")
             key, val = tuple(col[:-1]), col[-1]
-            bfact[key] = float(val)
+            data[key] = float(val)
 
     if mode == "atom":
         # Set property by atom
         _self.alter(
             selection,
-            "{} = bfact[chain,resn,resi,name]".format(var),
+            "{} = data[chain, resn, resi, name]".format(var),
             space=locals(),
         )
     elif mode == "res":
         # Set property by residues
         _self.alter(
             selection,
-            "{} = bfact[chain,resn,resi]".format(var),
+            "{} = data[chain, resn, resi]".format(var),
             space=locals(),
         )
 
@@ -99,36 +56,35 @@ def load_bfact(file, selection="(all)", var="b", vis=1, *, _self=cmd):
     if vis:
         palette = ["marine", "silver", "red"]
         obj = _self.get_object_list(selection)[0]
-        vmin, vmax = min(bfact.values()), max(bfact.values())
-        _self.spectrum(var, " ".join(palette), selection, vmin, vmax)
-        _self.ramp_new("ramp", obj, [vmin, vmax], palette)
+        range = (min(data.values()), max(data.values()))
+        _self.spectrum(var, " ".join(palette), selection, range[0], range[1])
+        _self.ramp_new("ramp", obj, range, palette)
 
     return
 
 
-def _get_keyword(string):
-    """ Scan a string for keywords i.e. '[ keyword ]' """
-    k = re.search(r'\[(.*?)\]', string)
-    return k.string.split()[1] if k else None
-
-
 @cmd.extend
-def load_topol(file, selection="(all)", *, _self=cmd):
+def load_topol(filename, selection="(all)", *, _self=cmd):
     """
     DESCRIPTION
         Load GROMACS topology (.top) file to selection.
     USAGE
-        load_topol file [, selection ]
+        load_topol filename [, selection ]
     """
     atom_list = collections.defaultdict(lambda: [0, 0])
     current = None
 
-    for line in open(file, "r"):
+    def get_keyword(string):
+        """ Scan a string for keywords i.e. '[ keyword ]' """
+        k = re.search(r'\[(.*?)\]', string)
+        return k.string.split()[1] if k else None
+
+    for line in open(filename, "r"):
         line = line.split(";")[0].strip()
         if not line:
             continue
 
-        key = _get_keyword(line)
+        key = get_keyword(line)
         if key:
             current = key
             continue
@@ -152,51 +108,25 @@ def load_topol(file, selection="(all)", *, _self=cmd):
 
 
 @cmd.extend
-def save_ndx(file="index.ndx", quiet=0, *, _self=cmd):
-    """
-    DESCRIPTION
-        Save all selections as GROMACS index (.ndx) file.
-    USAGE
-        save_ndx [ file [, quiet ]]
-    """
-    quiet = int(quiet)
-
-    selections = cmd.get_names("public_selections")
-    groups = dict()
-
-    for name in selections:
-        groups[name] = list()
-        cmd.iterate(name, "group.append(index)", space={"group": groups[name]})
-
-    with open(file, "w") as handle:
-        nlines = 15  # Number of indeces per line
-        for name, group in groups.items():
-            if not quiet:
-                print(f"Saving group: '{name}' len(group atoms)")
-            print(f"[ {name} ]", file=handle)
-            for i in range(0, len(group), nlines):
-                print(
-                    " ".join(f"{x:5}" for x in group[i:i+nlines]), file=handle)
-
-    return
-
-
-@cmd.extend
-def load_ndx(file, quiet=0, *, _self=cmd):
+def load_ndx(filename, quiet=0, *, _self=cmd):
     """
     DESCRIPTION
         Read a GROMACS index (.ndx) file as a selection.
     USAGE
-        read_ndx file [, quiet ]
+        read_ndx filename [, quiet ]
     """
     quiet = int(quiet)
-
     groups = dict()
 
+    def get_keyword(string):
+        """ Scan a string for keywords i.e. '[ keyword ]' """
+        k = re.search(r'\[(.*?)\]', string)
+        return k.string.split()[1] if k else None
+
     current = None
-    for line in open(file, "r"):
+    for line in open(filename, "r"):
         line = line.split(";")[0]
-        key = _get_keyword(line)
+        key = get_keyword(line)
         if key:
             current = key
             groups[current] = []
@@ -219,10 +149,10 @@ def load_ndx(file, quiet=0, *, _self=cmd):
 
         # Pymol does not like long selection strings so we select the group iteratively
         every = 15
-        cmd.select(f"({name})", f"index {group[0]}")
+        _self.select(f"({name})", f"index {group[0]}")
         for i in range(1, len(group), every):
             buffer = "index " + "+".join(str(x) for x in group[i:i+every])
-            cmd.select(name, f"({name}) | {buffer}", quiet=1)
+            _self.select(name, f"({name}) | {buffer}", quiet=1)
 
     return
 
@@ -277,12 +207,12 @@ def save_colored_fasta(file, selection="all", invert=0, *, _self=cmd):
             html.append("<span> </span>")
         return
 
-    for obj in cmd.get_object_list(selection):
-        for chain in cmd.get_chains(f"model {obj} and ({selection})"):
+    for obj in _self.get_object_list(selection):
+        for chain in _self.get_chains(f"model {obj} and ({selection})"):
             sele = f"m. {obj} & c. '{chain}' and ({selection})"
             html.append(f"&gt;{obj}|{chain}")
             stored.resv = 0
-            cmd.iterate(sele, "callback(resv, resn, color)", space=locals())
+            _self.iterate(sele, "callback(resv, resn, color)", space=locals())
             html.append("<br>")
 
     with open(file, "w") as handle:
@@ -291,3 +221,12 @@ def save_colored_fasta(file, selection="all", invert=0, *, _self=cmd):
         print("</body></html>", file=handle)
 
     return
+
+
+try:
+    from pymol.importing import loadfunctions
+    loadfunctions.setdefault("csv", load_csv)
+    loadfunctions.setdefault("top", load_topol)
+    loadfunctions.setdefault("ndx", load_ndx)
+except ImportError:
+    pass
