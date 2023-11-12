@@ -25,7 +25,7 @@ def cbc(selection="(all)"):
         if len(chain.split()) != 1:
             chain = f"'{chain}'"
         color = _color_cycle[i % len(_color_cycle)]
-        cmd.color(color, f"(({selection}) & {chain} & e. C)")
+        cmd.color(color, f"(({selection}) & chain {chain} & e. C)")
     return
 
 
@@ -45,38 +45,41 @@ def cbe(selection="(all)", *, _self=cmd, **kwargs):
 
 
 @cmd.extend
-def cbattr(selection="(all)", negative=0, positive=0, polar=0, nonpolar=0, special=0, *, _self=cmd):
+def cbattr(selection="(all)", *args, _self=cmd):
     """
     DESCRIPTION
         Color by residue by attribute.
     USAGE
         cbattr [ selection [, attribute ]]
+    ATTRIBUTES
+        negative, positive, polar, nonpolar, special, element
     """
-    negative = int(negative)
-    positive = int(positive)
-    polar = int(polar)
-    nonpolar = int(nonpolar)
-    special = int(special)
 
-    if not any([negative, positive, polar, nonpolar, special]):
-        negative, positive, polar, nonpolar, special = 1, 1, 1, 1, 1
+    if "negative" in args or "all" in args:
+        resn = ["ASP", "GLU"]
+        _self.color("red", f"({selection}) & resn {'+'.join(resn)}")
 
-    _res_negative = ["ASP", "GLU"]
-    _res_positive = ["ARG", "HIS", "LYS"]
-    _res_polar = ["ASN", "GLN", "SER", "THR"]
-    _res_nonpolar = ["ALA", "ILE", "LEU", "MET", "PHE", "TRP", "TYR", "VAL"]
-    _res_special = ["CYS", "GLY", "PRO"]
+    if "positive" in args or "all" in args:
+        resn = ["ARG", "HIS", "LYS"]
+        _self.color("marine", f"({selection}) & resn {'+'.join(resn)}")
 
-    if negative:
-        cmd.color("red", f"({selection}) & resn {'+'.join(_res_negative)}")
-    if positive:
-        cmd.color("marine", f"({selection}) & resn {'+'.join(_res_positive)}")
-    if polar:
-        cmd.color("tv_green", f"({selection}) & resn {'+'.join(_res_polar)}")
-    if nonpolar:
-        cmd.color("yellow", f"({selection}) & resn {'+'.join(_res_nonpolar)}")
-    if special:
-        cmd.color("gray", f"({selection}) & resn {'+'.join(_res_special)}")
+    if "polar" in args or "all" in args:
+        resn = ["ASN", "GLN", "SER", "THR"]
+        _self.color("tv_green", f"({selection}) & resn {'+'.join(resn)}")
+
+    if "nonpolar" in args or "all" in args:
+        resn = ["ALA", "ILE", "LEU", "MET", "PHE", "TRP", "TYR", "VAL"]
+        _self.color("yellow", f"({selection}) & resn {'+'.join(resn)}")
+
+    if "special" in args or "all" in args:
+        resn = ["CYS", "GLY", "PRO"]
+        _self.color("gray", f"({selection}) & resn {'+'.join(resn)}")
+
+    if "element" in args or "all" in args:
+        _self.color("white", f"({selection}) & e. H")
+        _self.color("blue", f"({selection}) & e. N")
+        _self.color("red", f"({selection}) & e. O")
+        _self.color("yellow", f"({selection}) & e. S")
 
     return
 
@@ -119,26 +122,26 @@ class _Colors():
 palette = _Palette()
 
 # Custom colors
-cmd.set_color("my_green", [62, 198, 146])
-cmd.set_color("my_blue", [76, 148, 252])
-cmd.set_color("my_orange", [245, 165, 102])
-cmd.set_color("my_red", [224, 86, 88])
-cmd.set_color("my_yellow", [251, 218, 66])
-cmd.set_color("my_pink", [216, 112, 186])
-cmd.set_color("my_dark", [92, 93, 92])
-cmd.set_color("my_cyan", [63, 184, 201])
-cmd.set_color("my_purple", [170, 111, 218])
+cmd.set_color("flat.green", [62, 198, 146])
+cmd.set_color("flat.blue", [76, 148, 252])
+cmd.set_color("flat.orange", [245, 165, 102])
+cmd.set_color("flat.red", [224, 86, 88])
+cmd.set_color("flat.yellow", [251, 218, 66])
+cmd.set_color("flat.pink", [216, 112, 186])
+cmd.set_color("flat.dark", [92, 93, 92])
+cmd.set_color("flat.cyan", [63, 184, 201])
+cmd.set_color("flat.purple", [170, 111, 218])
 menu.all_colors_list.append(
-    ("custom", [
-        ("275", "my_green"),
-        ("259", "my_blue"),
-        ("963", "my_orange"),
-        ("833", "my_red"),
-        ("982", "my_yellow"),
-        ("847", "my_pink"),
-        ("333", "my_dark"),
-        ("277", "my_cyan"),
-        ("648", "my_purple"),
+    ("flat", [
+        ("275", "flat.green"),
+        ("259", "flat.blue"),
+        ("963", "flat.orange"),
+        ("833", "flat.red"),
+        ("982", "flat.yellow"),
+        ("847", "flat.pink"),
+        ("333", "flat.dark"),
+        ("277", "flat.cyan"),
+        ("648", "flat.purple"),
     ]),
 )
 
@@ -159,17 +162,17 @@ menu.all_colors_list.append(
 )
 
 # AlphaFold colors
-palette.alphafold = _Colors("af_high", "af_medium", "af_low", "af_crit")
-palette.alphafold_rev = _Colors("af_crit", "af_low", "af_medium", "af_high")
-cmd.set_color("af_high", [0, 83, 214])
-cmd.set_color("af_medium", [101, 203, 243])
-cmd.set_color("af_low", [255, 219, 19])
-cmd.set_color("af_crit", [255, 125, 69])
+palette.alphafold = _Colors("high", "medium", "low", "crit")
+palette.alphafold_rev = _Colors("crit", "low", "medium", "high")
+cmd.set_color("high", [0, 83, 214])
+cmd.set_color("medium", [101, 203, 243])
+cmd.set_color("low", [255, 219, 19])
+cmd.set_color("crit", [255, 125, 69])
 menu.all_colors_list.append(
     ('alphafold', [
-        ('038', 'af_high'),
-        ('379', 'af_medium'),
-        ('980', 'af_low'),
-        ('942', 'af_crit'),
+        ('038', 'high'),
+        ('379', 'medium'),
+        ('980', 'low'),
+        ('942', 'crit'),
     ]),
 )
