@@ -163,6 +163,8 @@ def get_seq(selection, chainbreak="/", unknown="X", *, _self=cmd):
         get_seq selection [, chainbreak [, unknown ]]
     """
     # See: https://github.com/speleo3/pymol-psico/blob/master/psico/modelling.py#L427
+    from pymol.exporting import _resn_to_aa as one_letter
+
     seq_list = []
     _self.iterate(
         f"({selection}) & polymer",
