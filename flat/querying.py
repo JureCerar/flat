@@ -171,7 +171,6 @@ def get_seq(selection, chainbreak="/", unknown="X", *, _self=cmd):
     )
 
     def seqbuilder():
-        from . import one_letter
         prev_resv = None
         for resn, resv in seq_list:
             if resv != prev_resv:
