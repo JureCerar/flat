@@ -1,4 +1,5 @@
 from pymol import cmd, menu
+import itertools
 
 # Custom color cycle (only 9 colors)
 _color_cycle = [
@@ -13,19 +14,50 @@ _color_cycle = [
     "0xaa6fda", # purple
 ]
 
+
+def hex2rgb(hex):
+    """hex to rgb"""
+    return tuple(int(hex[i:i+2], 16) for i in (2, 4, 6))
+
+
+def rgb2hex(rgb):
+    """rgb to hex"""
+    return "0x%02x%02x%02x" % rgb
+
+
+def mix(rgb1, rgb2, x=0):
+    """Mix two colors"""
+    return tuple(
+        int((1 - x) * a + x * b) for a, b in zip(rgb1, rgb2)
+    ) 
+
+
 @cmd.extend
-def cbc(selection="(all)"):
+def cbo(selection="(all)", *, _self=cmd):
     """
     DESCRIPTION
-        Color all chains a different color.
+        Color by objects
     USAGE
         cbc [ selection ]
     """
-    for i, chain in enumerate(cmd.get_chains(selection)):
-        if len(chain.split()) != 1:
-            chain = f"'{chain}'"
-        color = _color_cycle[i % len(_color_cycle)]
-        cmd.color(color, f"(({selection}) & chain {chain} & e. C)")
+    color = itertools.cycle(_color_cycle)
+    for obj in cmd.get_names("public_objects", 0, selection):
+        _self.color(next(color), f"({selection}) & %{obj} & e. C")
+    return
+
+
+@cmd.extend
+def cbc(selection="(all)", *, _self=cmd):
+    """
+    DESCRIPTION
+        Color by chains
+    USAGE
+        cbc [ selection ]
+    """
+    colors = itertools.cycle(_color_cycle)
+    for chain in _self.get_chains(selection):
+        print(f"({selection}) & c. '{chain}' & e. C")
+        _self.color(next(colors), f"({selection}) & c. {chain} & e. C")
     return
 
 
@@ -33,14 +65,18 @@ def cbc(selection="(all)"):
 def cbe(selection="(all)", *, _self=cmd, **kwargs):
     """
     DESCRIPTION
-        Color all elements a different color.
+        Color by elements
     USAGE
         cbe [ selection [, <element>=<color> ]]
     EXAMPLE
         cbe (all), C=green, oxygen=red
     """
+    _self.color("white", f"({selection}) & e. H")
+    _self.color("blue", f"({selection}) & e. N")
+    _self.color("red", f"({selection}) & e. O")
+    _self.color("yellow", f"({selection}) & e. S")
     for element, color in kwargs.items():
-        cmd.color(color, f"(({selection}) & e. {element})")
+        _self.color(color, f"(({selection}) & e. {element})")
     return
 
 
@@ -48,38 +84,32 @@ def cbe(selection="(all)", *, _self=cmd, **kwargs):
 def cbattr(selection="(all)", *args, _self=cmd):
     """
     DESCRIPTION
-        Color by residue by attribute.
+        Color by residue attribute.
     USAGE
         cbattr [ selection [, attribute ]]
-    ATTRIBUTES
-        negative, positive, polar, nonpolar, special, element
+    NOTES
+        Attributes: negative, positive, polar, nonpolar, and special
     """
 
-    if "negative" in args or "all" in args:
-        resn = ["ASP", "GLU"]
-        _self.color("red", f"({selection}) & resn {'+'.join(resn)}")
+    if "negative" in args or not args:
+        res = ["ASP", "GLU"]
+        _self.color("red", f"({selection}) & resn {'+'.join(res)}")
 
-    if "positive" in args or "all" in args:
-        resn = ["ARG", "HIS", "LYS"]
-        _self.color("marine", f"({selection}) & resn {'+'.join(resn)}")
+    if "positive" in args or not args:
+        res = ["ARG", "HIS", "LYS"]
+        _self.color("marine", f"({selection}) & resn {'+'.join(res)}")
 
-    if "polar" in args or "all" in args:
-        resn = ["ASN", "GLN", "SER", "THR"]
-        _self.color("tv_green", f"({selection}) & resn {'+'.join(resn)}")
+    if "polar" in args or not args:
+        res = ["ASN", "GLN", "SER", "THR"]
+        _self.color("tv_green", f"({selection}) & resn {'+'.join(res)}")
 
-    if "nonpolar" in args or "all" in args:
-        resn = ["ALA", "ILE", "LEU", "MET", "PHE", "TRP", "TYR", "VAL"]
-        _self.color("yellow", f"({selection}) & resn {'+'.join(resn)}")
+    if "nonpolar" in args or not args:
+        res = ["ALA", "ILE", "LEU", "MET", "PHE", "TRP", "TYR", "VAL"]
+        _self.color("yellow", f"({selection}) & resn {'+'.join(res)}")
 
-    if "special" in args or "all" in args:
-        resn = ["CYS", "GLY", "PRO"]
-        _self.color("gray", f"({selection}) & resn {'+'.join(resn)}")
-
-    if "element" in args or "all" in args:
-        _self.color("white", f"({selection}) & e. H")
-        _self.color("blue", f"({selection}) & e. N")
-        _self.color("red", f"({selection}) & e. O")
-        _self.color("yellow", f"({selection}) & e. S")
+    if "special" in args or not args:
+        res = ["CYS", "GLY", "PRO"]
+        _self.color("gray", f"({selection}) & resn {'+'.join(res)}")
 
     return
 
@@ -98,9 +128,6 @@ class _Colors():
         return
 
     def __repr__(self):
-        return " ".join(self.colors)
-
-    def replace(self, *args):
         return " ".join(self.colors)
 
     def __iter__(self):
@@ -145,34 +172,48 @@ menu.all_colors_list.append(
     ]),
 )
 
-# Novartis colors
-palette.novartis = _Colors("novartis", "carmine", "sienna", "apricot")
-palette.novartis_rev = _Colors("apricot", "sienna", "carmine", "novartis")
-cmd.set_color("novartis", [4, 96, 169])
-cmd.set_color("carmine", [141, 21, 27])
-cmd.set_color("sienna", [231, 74, 33])
-cmd.set_color("apricot", [236, 154, 30])
+# Novartis NEW colors
+palette.nvs_blue = _Colors("nvs.novartis", "nvs.turquoise")
+palette.nvs_blue_rev = _Colors("nvs.turquoise", "nvs.novartis")
+palette.nvs_purple = _Colors("nvs.purple", "nvs.coral")
+palette.nvs_purple_rev = _Colors("nvs.coral", "nvs.purple")
+palette.nvs_coral = _Colors("nvs.coral", "nvs.amber")
+palette.nvs_coral_rev = _Colors("nvs.amber", "nvs.coral")
+cmd.set_color("nvs.novartis", [4, 96, 169])  #0460a9
+cmd.set_color("nvs.carmine", [141, 21, 27])
+cmd.set_color("nvs.sienna", [231, 74, 33])
+cmd.set_color("nvs.apricot", [236, 154, 30])
+cmd.set_color("nvs.deep", [0, 32, 104]) #002068
+cmd.set_color("nvs.coral", [255, 88, 93])  # ff585d
+cmd.set_color("nvs.purple", [143, 45, 222])  # 8f2dde
+cmd.set_color("nvs.turquoise", [80, 226, 208])  # 50e2d0
+cmd.set_color("nvs.amber", [255, 193, 0])  # ffc100
 menu.all_colors_list.append(
-    ('novartis', [
-        ('036', 'novartis'),
-        ('501', 'carmine'),
-        ('921', 'sienna'),
-        ('961', 'apricot'),
+    ("novartis", [
+        ("036", "nvs.novartis"),
+        ("501", "nvs.carmine"),
+        ("921", "nvs.sienna"),
+        ("961", "nvs.apricot"),
+        ("014", "nvs.deep"),
+        ("933", "nvs.coral"),
+        ("518", "nvs.purple"),
+        ("388", "nvs.turquoise"),
+        ("970", "nvs.amber"),
     ]),
 )
 
 # AlphaFold colors
-palette.alphafold = _Colors("high", "medium", "low", "crit")
-palette.alphafold_rev = _Colors("crit", "low", "medium", "high")
-cmd.set_color("high", [0, 83, 214])
-cmd.set_color("medium", [101, 203, 243])
-cmd.set_color("low", [255, 219, 19])
-cmd.set_color("crit", [255, 125, 69])
+palette.alphafold = _Colors("af.high", "af.medium", "af.low", "af.crit")
+palette.alphafold_rev = _Colors("af.crit", "af.low", "af.medium", "af.high")
+cmd.set_color("af.high", [0, 83, 214])
+cmd.set_color("af.medium", [101, 203, 243])
+cmd.set_color("af.low", [255, 219, 19])
+cmd.set_color("af.crit", [255, 125, 69])
 menu.all_colors_list.append(
-    ('alphafold', [
-        ('038', 'high'),
-        ('379', 'medium'),
-        ('980', 'low'),
-        ('942', 'crit'),
+    ("alphafold", [
+        ("038", "af.high"),
+        ("379", "af.medium"),
+        ("980", "af.low"),
+        ("942", "af.crit"),
     ]),
 )
