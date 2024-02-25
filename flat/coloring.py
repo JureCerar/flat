@@ -56,7 +56,6 @@ def cbc(selection="(all)", *, _self=cmd):
     """
     colors = itertools.cycle(_color_cycle)
     for chain in _self.get_chains(selection):
-        print(f"({selection}) & c. '{chain}' & e. C")
         _self.color(next(colors), f"({selection}) & c. {chain} & e. C")
     return
 
