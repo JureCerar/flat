@@ -153,7 +153,7 @@ def ext_coef(selection="all", state=-1, *, quiet=0, _self=cmd):
 
 
 @cmd.extend
-def get_seq(selection, chainbreak="/", unknown="X", *, _self=cmd):
+def get_seq(selection, chainbreak="/", unknown="X", quiet=1, *, _self=cmd):
     """
     DESCRIPTION
         Gets the one-letter sequence, including residues without coordinates.
@@ -182,8 +182,13 @@ def get_seq(selection, chainbreak="/", unknown="X", *, _self=cmd):
                     print('Warning: unknown residue "%s"' % (resn))
                     yield unknown
                 prev_resv = resv
+    
+    seq = seqbuilder()
 
-    return ''.join(seqbuilder())
+    if not quiet:
+        print("get_seq:", "".join(seq))
+
+    return ''.join(seq)
 
 
 @cmd.extend
@@ -241,6 +246,7 @@ def get_dipole(selection="all", state=0, var="partial_charge", vis=1, *, _self=c
         _self.load_cgo(obj, name, state=state, zoom=1)
 
     return dipole
+
 
 @cmd.extend
 def get_raw_distances(names='', state=1, selection='all', quiet=1, *, _self=cmd):
