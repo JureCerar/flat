@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# 
+#
 # Copyright (C) 2023 Jure Cerar
 #
 # This program is free software: you can redistribute it and/or modify
@@ -20,7 +20,6 @@ Docstring
 """
 
 __version__ = "0.0.0"
-
 __author__ = ""
 __credits__ = [""]
 __copyright__ = ""
@@ -29,79 +28,92 @@ __maintainer__ = ""
 __email__ = ""
 
 try:
-  from pymol import cmd
-  pymol_version = cmd.get_version()[1]
+    from pymol import cmd
+    pymol_version = cmd.get_version()[1]
 except:
-  pymol_version = "1.6"
-  
+    pymol_version = "1.6"
+
 __all__ = [
-  "",
+    "coloring",
+    "electrostatics",
+    "exporting",
+    "hydrophobic",
+    "importing",
+    "interface",
+    "modelling",
+    # "plotting",
+    "querying",
+    "seqalign",
+    "viewing",
 ]
 
-
-def make_global():
-  """ Invoke this function if you want to do 'from ... import ...' """
-  import sys
-  if sys.modules.get('flat') != sys.modules[__name__]:
-    sys.modules['flat'] = sys.modules[__name__]
-  return
-
-
 def init():
-  """ Imports all submodules and puts library into the pymol namespace for GUI menus. Also enables "help" in the PyMOL command line. """
-  import pymol
-  from pymol import cmd
-  # Init all submodules
-  flat = __import__(__name__, fromlist=__all__)
-  # pymol namespace
-  if not hasattr(pymol, 'flat'):
-    pymol.ssx = flat
-  # pymol help
-  if 'flat' not in cmd.help_only:
-    cmd.help_only['flat'] = [flat]
-    cmd.help_sc.append('flat')
-  return
+    """
+    Imports all submodules and puts library into the pymol namespace
+    for GUI menus. Also enables "help" in the PyMOL command line.
+    """
+    import sys
+    import pymol
+    from pymol import cmd
+
+    # Init all submodules
+    flat = __import__(__name__, fromlist=__all__)
+    if not hasattr(pymol, "flat"):
+        pymol.flat = flat
+
+    # Allow import *
+    if sys.modules.get("flat") != sys.modules[__name__]:
+        sys.modules["flat"] = sys.modules[__name__]
+
+    # pymol help
+    if "flat" not in cmd.help_only:
+        cmd.help_only["flat"] = [flat]
+        cmd.help_sc.append("flat")
+
+    return
 
 
-def __init_plugin__(self=None):
-  """ PyMOL Plugin hook """
-  init()
-  make_global()
- 
-  
+def __init_plugin__(app=None):
+    """ PyMOL Plugin hook """
+    init()
+
+
 # See also http://pymolwiki.org/index.php/Aa_codes
 one_letter = {
-  'PAQ': 'Y', 'AGM': 'R', 'ILE': 'I', 'PR3': 'C', 'GLN': 'Q', 'DVA': 'V',
-  'CCS': 'C', 'ACL': 'R', 'GLX': 'Z', 'GLY': 'G', 'GLZ': 'G', 'DTH': 'T',
-  'OAS': 'S', 'C6C': 'C', 'NEM': 'H', 'DLY': 'K', 'MIS': 'S', 'SMC': 'C',
-  'GLU': 'E', 'NEP': 'H', 'BCS': 'C', 'ASQ': 'D', 'ASP': 'D', 'SCY': 'C',
-  'SER': 'S', 'LYS': 'K', 'SAC': 'S', 'PRO': 'P', 'ASX': 'B', 'DGN': 'Q',
-  'DGL': 'E', 'MHS': 'H', 'ASB': 'D', 'ASA': 'D', 'NLE': 'L', 'DCY': 'C',
-  'ASK': 'D', 'GGL': 'E', 'STY': 'Y', 'SEL': 'S', 'CGU': 'E', 'ASN': 'N',
-  'ASL': 'D', 'LTR': 'W', 'DAR': 'R', 'VAL': 'V', 'CHG': 'A', 'TPO': 'T',
-  'CLE': 'L', 'GMA': 'E', 'HAC': 'A', 'AYA': 'A', 'THR': 'T', 'TIH': 'A',
-  'SVA': 'S', 'MVA': 'V', 'SAR': 'G', 'LYZ': 'K', 'BNN': 'A', '5HP': 'E',
-  'IIL': 'I', 'SHR': 'K', 'HAR': 'R', 'FME': 'M', 'PYX': 'C', 'ALO': 'T',
-  'PHI': 'F', 'ALM': 'A', 'PHL': 'F', 'MEN': 'N', 'TPQ': 'A', 'GSC': 'G',
-  'PHE': 'F', 'ALA': 'A', 'MAA': 'A', 'MET': 'M', 'UNK': 'X', 'LEU': 'L',
-  'ALY': 'K', 'SET': 'S', 'GL3': 'G', 'TRG': 'K', 'CXM': 'M', 'TYR': 'Y',
-  'SCS': 'C', 'DIL': 'I', 'TYQ': 'Y', '3AH': 'H', 'DPR': 'P', 'PRR': 'A',
-  'CME': 'C', 'IYR': 'Y', 'CY1': 'C', 'TYY': 'Y', 'HYP': 'P', 'DTY': 'Y',
-  '2AS': 'D', 'DTR': 'W', 'FLA': 'A', 'DPN': 'F', 'DIV': 'V', 'PCA': 'E',
-  'MSE': 'M', 'MSA': 'G', 'AIB': 'A', 'CYS': 'C', 'NLP': 'L', 'CYQ': 'C',
-  'HIS': 'H', 'DLE': 'L', 'CEA': 'C', 'DAL': 'A', 'LLP': 'K', 'DAH': 'F',
-  'HMR': 'R', 'TRO': 'W', 'HIC': 'H', 'CYG': 'C', 'BMT': 'T', 'DAS': 'D',
-  'TYB': 'Y', 'BUC': 'C', 'PEC': 'C', 'BUG': 'L', 'CYM': 'C', 'NLN': 'L',
-  'CY3': 'C', 'HIP': 'H', 'CSO': 'C', 'TPL': 'W', 'LYM': 'K', 'DHI': 'H',
-  'MLE': 'L', 'CSD': 'A', 'HPQ': 'F', 'MPQ': 'G', 'LLY': 'K', 'DHA': 'A',
-  'DSN': 'S', 'SOC': 'C', 'CSX': 'C', 'OMT': 'M', 'DSP': 'D', 'PTR': 'Y',
-  'TRP': 'W', 'CSW': 'C', 'EFC': 'C', 'CSP': 'C', 'CSS': 'C', 'SCH': 'C',
-  'OCS': 'C', 'NMC': 'G', 'SEP': 'S', 'BHD': 'D', 'KCX': 'K', 'SHC': 'C',
-  'C5C': 'C', 'HTR': 'W', 'ARG': 'R', 'TYS': 'Y', 'ARM': 'R', 'DNP': 'A',
+    "PAQ": "Y", "AGM": "R", "ILE": "I", "PR3": "C", "GLN": "Q", "DVA": "V",
+    "CCS": "C", "ACL": "R", "GLX": "Z", "GLY": "G", "GLZ": "G", "DTH": "T",
+    "OAS": "S", "C6C": "C", "NEM": "H", "DLY": "K", "MIS": "S", "SMC": "C",
+    "GLU": "E", "NEP": "H", "BCS": "C", "ASQ": "D", "ASP": "D", "SCY": "C",
+    "SER": "S", "LYS": "K", "SAC": "S", "PRO": "P", "ASX": "B", "DGN": "Q",
+    "DGL": "E", "MHS": "H", "ASB": "D", "ASA": "D", "NLE": "L", "DCY": "C",
+    "ASK": "D", "GGL": "E", "STY": "Y", "SEL": "S", "CGU": "E", "ASN": "N",
+    "ASL": "D", "LTR": "W", "DAR": "R", "VAL": "V", "CHG": "A", "TPO": "T",
+    "CLE": "L", "GMA": "E", "HAC": "A", "AYA": "A", "THR": "T", "TIH": "A",
+    "SVA": "S", "MVA": "V", "SAR": "G", "LYZ": "K", "BNN": "A", "5HP": "E",
+    "IIL": "I", "SHR": "K", "HAR": "R", "FME": "M", "PYX": "C", "ALO": "T",
+    "PHI": "F", "ALM": "A", "PHL": "F", "MEN": "N", "TPQ": "A", "GSC": "G",
+    "PHE": "F", "ALA": "A", "MAA": "A", "MET": "M", "UNK": "X", "LEU": "L",
+    "ALY": "K", "SET": "S", "GL3": "G", "TRG": "K", "CXM": "M", "TYR": "Y",
+    "SCS": "C", "DIL": "I", "TYQ": "Y", "3AH": "H", "DPR": "P", "PRR": "A",
+    "CME": "C", "IYR": "Y", "CY1": "C", "TYY": "Y", "HYP": "P", "DTY": "Y",
+    "2AS": "D", "DTR": "W", "FLA": "A", "DPN": "F", "DIV": "V", "PCA": "E",
+    "MSE": "M", "MSA": "G", "AIB": "A", "CYS": "C", "NLP": "L", "CYQ": "C",
+    "HIS": "H", "DLE": "L", "CEA": "C", "DAL": "A", "LLP": "K", "DAH": "F",
+    "HMR": "R", "TRO": "W", "HIC": "H", "CYG": "C", "BMT": "T", "DAS": "D",
+    "TYB": "Y", "BUC": "C", "PEC": "C", "BUG": "L", "CYM": "C", "NLN": "L",
+    "CY3": "C", "HIP": "H", "CSO": "C", "TPL": "W", "LYM": "K", "DHI": "H",
+    "MLE": "L", "CSD": "A", "HPQ": "F", "MPQ": "G", "LLY": "K", "DHA": "A",
+    "DSN": "S", "SOC": "C", "CSX": "C", "OMT": "M", "DSP": "D", "PTR": "Y",
+    "TRP": "W", "CSW": "C", "EFC": "C", "CSP": "C", "CSS": "C", "SCH": "C",
+    "OCS": "C", "NMC": "G", "SEP": "S", "BHD": "D", "KCX": "K", "SHC": "C",
+    "C5C": "C", "HTR": "W", "ARG": "R", "TYS": "Y", "ARM": "R", "DNP": "A",
+    "A": "A", "U": "U", "G": "G", "C": "C",  # RNA
+    "DA": "A", "DT": "T", "DG": "G", "DC": "C",  # DNA
 }
+
 three_letter = {
-  'A': 'ALA', 'C': 'CYS', 'E': 'GLU', 'D': 'ASP', 'G': 'GLY', 'F': 'PHE',
-  'I': 'ILE', 'H': 'HIS', 'K': 'LYS', 'M': 'MET', 'L': 'LEU', 'N': 'ASN',
-  'Q': 'GLN', 'P': 'PRO', 'S': 'SER', 'R': 'ARG', 'T': 'THR', 'W': 'TRP',
-  'V': 'VAL', 'Y': 'TYR',
-}  
+    "A": "ALA", "C": "CYS", "E": "GLU", "D": "ASP", "G": "GLY", "F": "PHE",
+    "I": "ILE", "H": "HIS", "K": "LYS", "M": "MET", "L": "LEU", "N": "ASN",
+    "Q": "GLN", "P": "PRO", "S": "SER", "R": "ARG", "T": "THR", "W": "TRP",
+    "V": "VAL", "Y": "TYR", "X": "UNK",
+}
