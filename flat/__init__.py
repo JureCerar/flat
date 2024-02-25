@@ -1,6 +1,4 @@
-#!/usr/bin/env python3
-#
-# Copyright (C) 2023 Jure Cerar
+# Copyright (C) 2023-2024 Jure Cerar
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,16 +14,13 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Docstring
+FLAT is a collection of scripts and utilities for PyMOL molecular visualizer.
 """
 
-__version__ = "0.0.0"
-__author__ = ""
-__credits__ = [""]
-__copyright__ = ""
-__license__ = ""
-__maintainer__ = ""
-__email__ = ""
+__author__ = "Jure Cerar"
+__copyright__ = "Copyright (C) 2023-2024 Jure Cerar"
+__license__ = "GNU GPL v3.0"
+__version__ = "0.1.0"
 
 try:
     from pymol import cmd
@@ -44,6 +39,7 @@ __all__ = [
     # "plotting",
     "querying",
     "seqalign",
+    # "shapes", 
     "viewing",
 ]
 
