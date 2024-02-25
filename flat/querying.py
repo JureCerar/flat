@@ -192,7 +192,7 @@ def get_seq(selection, chainbreak="/", unknown="X", quiet=1, *, _self=cmd):
 
 
 @cmd.extend
-def get_dipole(selection="all", state=0, var="partial_charge", vis=1, *, _self=cmd):
+def get_dipole(selection="all", state=0, var="formal_charge", vis=1, quiet=1, *, _self=cmd):
     """
     DESCRIPTION
         Get electric dipole momentum for atoms in selection. For VAR use
@@ -202,16 +202,17 @@ def get_dipole(selection="all", state=0, var="partial_charge", vis=1, *, _self=c
     ARGUMENTS
         selection = str: Atom selection {default: all}
         state = int: Object state (0 for current state). {default: 0}
-        var = str: Property used for calculation. {default: "partial_charge"}
+        var = str: Property used for calculation. {default: "formal_charge"}
         vis = int: Visualize output. {default: 1}
     """
     import numpy as np
-    state, vis = int(state), int(vis)
+    state, vis, quiet = int(state), int(vis), int(quiet)
 
     bfact = []
     _self.iterate_state(state, selection, f"bfact.append({var})", space=locals())
     com = np.array(_self.centerofmass(selection, state))
     xyz = np.array(_self.get_coords(selection, state))
+    bfact = np.array(bfact, dtype=float)
 
     if not any(bfact) or len(bfact) == 0:
        raise CmdException(f"Property '{var}' not assigned?")
@@ -222,10 +223,18 @@ def get_dipole(selection="all", state=0, var="partial_charge", vis=1, *, _self=c
 
     dipole /= 0.2081943  # From [e*nm] to [D]
 
+    if not quiet:
+        print(
+            " Util: Dipole_moment =",
+            f"{np.linalg.norm(dipole):.3f} D",
+            np.array2string(dipole, precision=2)
+        )
+
     if vis:
         color1 = _self.get_color_tuple("red")
         color2 = _self.get_color_tuple("blue")
 
+        # Scale arrow shape
         radius = 0.5
         hlength = radius * 3.0
         hradius = hlength * 0.6
@@ -238,14 +247,50 @@ def get_dipole(selection="all", state=0, var="partial_charge", vis=1, *, _self=c
         xyz2 = com + v
         xyz3 = xyz2 + v / np.linalg.norm(v) * hlength
 
-        name = _self.get_unused_name("dipole_moment")
-        obj = [cgo.CYLINDER, *xyz1, *xyz2, radius, *color1, *color2]
-        obj += [cgo.CONE, *xyz2, *xyz3, hradius,
-                0.0, *color2, *color2, 1.0, 0.0]
-
+        name = _self.get_unused_name("dipole")
+        obj = [
+            cgo.CYLINDER, *xyz1, *xyz2, radius, *color1, *color2,
+            cgo.CONE, *xyz2, *xyz3, hradius, 0.0, *color2, *color2, 1.0, 0.0,
+        ]
         _self.load_cgo(obj, name, state=state, zoom=1)
 
     return dipole
+
+
+@cmd.extend
+def get_longest_distance(selection="(all)", vis=1, *, _self=cmd):
+    """
+    DESCRIPTION
+        Get longest distance in a selection.
+    USAGE
+        get_longest_distance [ selection [, vis ]]
+    """
+    import numpy as np
+    from scipy import spatial
+
+    xyz = np.array(_self.get_coords(selection, 1))
+
+    # Find 2 points with largest distance (Convex Hull)
+    xyz_hull = xyz[spatial.ConvexHull(xyz).vertices]
+    dist_mat = spatial.distance_matrix(xyz_hull, xyz_hull)
+    i, j = np.unravel_index(dist_mat.argmax(), dist_mat.shape)
+    longest = xyz_hull[i] - xyz_hull[j]
+
+    if vis:
+        point_a = _self.get_unused_name("_point_A")
+        point_b = _self.get_unused_name("_point_B")
+        _self.pseudoatom(point_a, pos=xyz_hull[i].tolist())
+        _self.pseudoatom(point_b, pos=xyz_hull[j].tolist())
+        _self.distance(
+            _self.get_unused_name("distance"),
+            point_a,
+            point_b,
+            mode=0,
+        )
+        _self.delete(point_a)
+        _self.delete(point_b)
+
+    return longest
 
 
 @cmd.extend
