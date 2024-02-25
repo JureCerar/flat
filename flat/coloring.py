@@ -113,6 +113,27 @@ def cbattr(selection="(all)", *args, _self=cmd):
     return
 
 
+@cmd.extend
+def set_colors(scheme, *, _self=cmd):
+    """
+    DESCRIPTION
+        Set elements color scheme.
+    USAGE
+        set_colors scheme
+    SCHEMES
+        jmol, [more coming soon]
+    """
+    if scheme == "jmol":
+        _self.set("auto_color", 0)
+        _self.set_color("hydrogen", [1.000, 1.000, 1.000])
+        _self.set_color("carbon", [0.567, 0.567, 0.567])
+        _self.set_color("nitrogen", [0.189, 0.315, 0.976])
+        _self.set_color("oxygen", [1.000, 0.051, 0.051])
+        _self.set_color("fluorine", [0.567, 0.882, 0.314])
+        _self.set_color("sulfur", [1.000, 1.000, 0.189])
+        _self.recolor()
+
+
 class _Palette:
     """ Dummy class """
     pass
