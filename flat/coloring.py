@@ -145,7 +145,7 @@ class _Colors():
         return self.colors
 
 
-# Color palettes. PyMOL API only
+# Color palettes for PyMOL API only
 palette = _Palette()
 
 # Custom colors
@@ -157,7 +157,7 @@ cmd.set_color("flat.yellow", [251, 218, 66])
 cmd.set_color("flat.pink", [216, 112, 186])
 cmd.set_color("flat.dark", [92, 93, 92])
 cmd.set_color("flat.cyan", [63, 184, 201])
-cmd.set_color("flat.purple", [170, 111, 218])
+cmd.set_color("flat.purple", [162, 108, 252])
 menu.all_colors_list.append(
     ("flat", [
         ("275", "flat.green"),
@@ -172,7 +172,7 @@ menu.all_colors_list.append(
     ]),
 )
 
-# Novartis NEW colors
+# Novartis NEW colors and palettes 
 palette.nvs_blue = _Colors("nvs.novartis", "nvs.turquoise")
 palette.nvs_blue_rev = _Colors("nvs.turquoise", "nvs.novartis")
 palette.nvs_purple = _Colors("nvs.purple", "nvs.coral")
@@ -202,7 +202,7 @@ menu.all_colors_list.append(
     ]),
 )
 
-# AlphaFold colors
+# AlphaFold colors and palettes
 palette.alphafold = _Colors("af.high", "af.medium", "af.low", "af.crit")
 palette.alphafold_rev = _Colors("af.crit", "af.low", "af.medium", "af.high")
 cmd.set_color("af.high", [0, 83, 214])
