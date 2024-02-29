@@ -30,6 +30,7 @@ except:
 
 __all__ = [
     "coloring",
+    "editing",
     "electrostatics",
     "exporting",
     "hydrophobic",
@@ -74,7 +75,7 @@ def __init_plugin__(app=None):
     init()
 
 
-# See also http://pymolwiki.org/index.php/Aa_codes
+# See: http://pymolwiki.org/index.php/Aa_codes
 one_letter = {
     "PAQ": "Y", "AGM": "R", "ILE": "I", "PR3": "C", "GLN": "Q", "DVA": "V",
     "CCS": "C", "ACL": "R", "GLX": "Z", "GLY": "G", "GLZ": "G", "DTH": "T",
