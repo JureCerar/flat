@@ -14,6 +14,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from pymol import cmd, CmdException, cgo
+from . import one_letter
+import re
 
 
 @cmd.extend
@@ -176,7 +178,6 @@ def get_seq(selection, chainbreak="/", unknown="X", quiet=1, *, _self=cmd):
         get_seq selection [, chainbreak [, unknown ]]
     """
     # See: https://github.com/speleo3/pymol-psico/blob/master/psico/modelling.py#L427
-    from pymol.exporting import _resn_to_aa as one_letter
 
     seq_list = []
     _self.iterate(
@@ -204,6 +205,74 @@ def get_seq(selection, chainbreak="/", unknown="X", quiet=1, *, _self=cmd):
         print("get_seq:", "".join(seq))
 
     return ''.join(seq)
+
+
+@cmd.extend
+def find_seq(expression, selection="all", name="sele", merge=False, *, _self=cmd):
+    """
+    DESCRIPTION
+        Given a sequence/regex to find, select those matching 
+        amino acids in the protein.
+    USAGE
+        find_seq expression, [ selection [, name [, merge ]]]
+    ARGUMENTS
+        expression = str: the sequence of amino acids to match and selection.
+            This can be a sequence of amino acids or a regular expression.  
+        selection = str: a selection-expression. {default: "all"}
+        name = str: a unique name for the selection. {default: "(sele)"}
+        merge = int: merge to existing selection. {default: False}
+    EXAMPLE
+        > find_seq N[^P][TS]
+    """
+    merge = bool(merge)
+
+    # Check input parameters
+    if len(expression) == 0 or not isinstance(expression, str):
+        raise CmdException("Search sequence not provided")
+    if len(selection) == 0 or not isinstance(selection, str):
+        raise CmdException("Invalid selection or object")
+    if len(name) == 0 or not isinstance(name, str):
+        raise CmdException("Invalid name for the selection")
+
+    # Create a temporary selection
+    sele = _self.get_unused_name("_temp")
+    _self.select(sele, selection)
+
+    try:
+        # Iterate over residue selection
+        residues = []
+        _self.iterate(
+            f"bca. ({sele})",
+            "residues.append((resi, resn, chain))",
+            space=locals()
+        )
+
+        # Extract residues IDs, AA string, and chains
+        indices = [_[0] for _ in residues]
+        sequence = ''.join([one_letter.get(_[1], "-") for _ in residues])
+        chains = [_[2] for _ in residues]
+
+        # make an empty selection to which we add residues
+        _self.select(name, 'None', merge=merge)
+
+        regex = re.compile(expression.upper())
+        for m in regex.finditer(sequence):
+            (start, stop) = m.span()
+            # Are all selected residues from one chain?
+            sele_chains = chains[start:stop]
+            if len(set(sele_chains)) != 1:
+                continue
+            # Form a residue selection
+            sele_indices = "+".join(indices[i] for i in range(start, stop))
+            _self.select(
+                name,
+                f"{name} or ({sele} & i. {sele_indices} & c. '{sele_chains[0]}')",
+                merge=merge
+            )
+    finally:
+        _self.delete(sele)
+
+    return name
 
 
 @cmd.extend
