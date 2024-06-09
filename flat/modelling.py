@@ -16,6 +16,7 @@
 from pymol import cmd, CmdException
 import collections
 import sys
+from . import three_letter
 
 
 @cmd.extend
@@ -85,8 +86,8 @@ def renumber(selection, start=1, quiet=False, *, _self=cmd):
 @cmd.extend
 def relax(selection, backbone=1, neighbors=1, cycles=100, state=0, *, _self=cmd):
     """
-    DESCRIPTON
-        Relax the given selection.
+    DESCRIPTION
+        Relax the given selection using sculpting wizard.
     USAGE
         relax selection [, backbone [, neighbors [, cycles [, state ]]]]
     """
@@ -122,102 +123,6 @@ def relax(selection, backbone=1, neighbors=1, cycles=100, state=0, *, _self=cmd)
 
 
 @cmd.extend
-def graft(mobile, target, out=None, sculpt=1, cycles=100, *, _self=cmd):
-    """
-    DESCRIPTION
-        Graft mobile structure on target structure. Similarity between aligned
-        mobile and target structure must be >80 %.
-    USAGE
-        graft mobile, target [, out [, minimize ]]
-    ARGUMENTS
-        mobile = string: atom selection of mobile section.
-        target = string: atom selection of target section. 
-        out = string: output structure name {default: None}
-        minimize = str: Do a short minimization of grafted structure {default: True}
-    """
-    sculpt, cycles = int(sculpt), int(cycles)
-
-    if len(_self.get_chains(mobile)) != 1:
-        raise CmdException("Mobile selection must contain only one chain")
-
-    if len(_self.get_chains(target)) != 1:
-        raise CmdException("Target selection must contain only one chain")
-
-    _mobile = _self.get_unused_name("mobile")
-    _self.copy_to(_mobile, mobile, rename="", zoom=0)
-    mobile_len = len(_self.get_model(_mobile).get_residues())
-
-    _target = _self.get_unused_name("target")
-    _self.copy_to(_target, target, rename="", zoom=0)
-    target_len = len(_self.get_model(_target).get_residues())
-
-    # Clean-up mobile section; chain and segi must match target section.
-    model = _self.get_model(_target)
-    chain, segi = model.atom[0].chain, model.atom[0].segi
-    _self.alter(_mobile, f"chain='{chain}'; segi='{segi}'")
-    _self.remove(f"{_mobile} & name OXT")
-
-    # Alignment method "cealign" method works best for this use
-    _self.extra_fit(
-        _mobile,
-        _target,
-        "cealign",
-        mobile_state=-1,
-        target_state=-1
-    )
-    align = _self.get_unused_name("align")
-    score = _self.align(_mobile, _target, quiet=0, object=align)
-    if score[0] > 100.0:
-        raise Warning("RMSD value is high. Are you sure this is correct alignment?")
-
-    # Renumber target and mobile to correct numbering
-    model = _self.get_model(f"{align} & {_target}")
-    first, last = int(model.atom[0].resi), int(model.atom[-1].resi)
-
-    if not out:
-        out = _self.get_unused_name("out")
-    renumber(_mobile, start=first)
-    _self.copy_to(out, _mobile, rename="", zoom=0)
-
-    # Split target section into left and right objects.
-    # Correctly renumber objects and then combine/join them.
-    # Do a energy minimization around newly bonded sections.
-    if first > 1:
-        target_left = _self.get_unused_name("target_left")
-        _self.select(target_left, f"{_target} & resi 1-{first-1}")
-        renumber(target_left, start=1)
-        _self.copy_to(out, target_left, rename="", zoom=0)
-        _self.bond(
-            f"/{out}///{first-1}/C",
-            f"/{out}///{first}/N",
-        )
-        _self.delete(target_left)
-        if sculpt:
-            relax(f"{out} & resi {first-1}-{first}", 1, 1, cycles)
-
-    if last < target_len:
-        target_right = _self.get_unused_name("target_right")
-        _self.select(target_right, f"{_target} & resi {last+1}-{target_len}")
-        resi = first + mobile_len
-        renumber(target_right, start=resi)
-        _self.copy_to(out, target_right, rename="", zoom=0)
-        _self.bond(
-            f"/{out}///{resi-1}/C",
-            f"/{out}///{resi}/N",
-        )
-        _self.delete(target_right)
-        if sculpt:
-            relax(f"{out} & resi {resi-1}-{resi}", 1, 1, cycles)
-
-    # Clean-up objects (in order they were created)
-    _self.delete(_mobile)
-    _self.delete(_target)
-    _self.delete(align)
-
-    return
-
-
-@cmd.extend
 def mutate(selection, residue, sculpt=0, cycles=100, *, _self=cmd):
     """
     DESCRIPTION
@@ -226,14 +131,8 @@ def mutate(selection, residue, sculpt=0, cycles=100, *, _self=cmd):
     USAGE
         mutate selection, residue [, sculpt [, cycles ]]
     """
+    from . import three_letter
     sculpt, cycles = int(sculpt), int(cycles)
-
-    three_letter = {
-        "A": "ALA", "C": "CYS", "E": "GLU", "D": "ASP", "G": "GLY", "F": "PHE",
-        "I": "ILE", "H": "HIS", "K": "LYS", "M": "MET", "L": "LEU", "N": "ASN",
-        "Q": "GLN", "P": "PRO", "S": "SER", "R": "ARG", "T": "THR", "W": "TRP",
-        "V": "VAL", "Y": "TYR",
-        }
     
     if len(_self.get_model(selection).get_residues()) != 1:
         raise CmdException("Multiple residues in selection.")
@@ -318,8 +217,9 @@ def add_missing_atoms(selection, sculpt=0, cycles=100, *, _self=cmd):
         Mutate those residues to themselves which have missing atoms.
     USAGE
         add_missing_atoms selection [, sculpt [, cycles ]]
+    SOURCE
+        From PSICO (c) 2010-2012 Thomas Holder, MPI for Developmental Biology
     """
-    # See: https://github.com/speleo3/pymol-psico/blob/master/psico/modelling.py#L249
     sculpt, cycles = int(sculpt), int(cycles)
 
     reference = {
@@ -388,3 +288,81 @@ def add_missing_atoms(selection, sculpt=0, cycles=100, *, _self=cmd):
             relax(sele, 0, 0, cycles)
 
     return 
+
+
+@cmd.extend
+def update_align(mobile, target, state=1, *, fix="none", quiet=1, _self=cmd):
+    """
+    DESCRIPTION
+        Update (and optionally fix) coordinates based on sequence alignment.
+    USAGE
+        update_align mobile, target [, state [, fix ]]
+    PARAMETERS
+        mobile = str: atom selection of mobile section.
+        target = str: atom selection of target section. 
+        state = int: select state. {default: 1}
+        fix = restrain | fix | protect | none: Method for fixing updated atoms
+    SOURCE
+        From PSICO (c) 2010-2012 Thomas Holder, MPI for Developmental Biology
+    """
+    aln = _self.get_unused_name("aln_hom")
+    _self.align(mobile, target, object=aln, cycles=0, max_gap=-1)
+    try:
+        mobile_aln = f"({mobile}) & {aln}"
+        _self.update(mobile_aln,
+                     f"({target}) & {aln}",
+                     state,
+                     state,
+                     matchmaker=0,
+                     quiet=quiet)
+        if fix == "restrain":
+            _self.reference("store", mobile_aln, state, quiet=quiet)
+            _self.flag("restrain", mobile_aln, "set", quiet=quiet)
+        elif fix == "fix":
+            _self.flag("fix", mobile_aln, "set", quiet=quiet)
+        elif fix == "protect":
+            _self.protect(mobile_aln, quiet=quiet)
+        elif fix != "none":
+            raise ValueError(fix)
+    finally:
+        _self.delete(aln)
+
+
+@cmd.extend
+def sculpt_homolog(mobile, target, state=1, cycles=1000, *, fix="restrain", quiet=1, _self=cmd):
+    """
+    DESCRIPTION
+        Sculpt mobile towards target, based on sequence alignment.
+    USAGE 
+        sculpt_homolog mobile, target [, state [, cycles [, fix ]]]
+    ARGUMENTS
+        mobile = str: atom selection of mobile section.
+        target = str: atom selection of target section. 
+        state = int: select state. {default: 1}
+        cycles: Number of sculpt iterations. {default: 1000}
+        fix = restrain | fix | protect | none: Method for fixing updated atoms
+    SOURCE
+        From PSICO(c) 2010-2012 Thomas Holder, MPI for Developmental Biology
+    """
+    (mobile_object, ) = _self.get_object_list(mobile)
+    _self.sculpt_activate(mobile_object, state)
+    update_align(mobile, target, state, fix=fix, quiet=quiet, _self=_self)
+    _self.sculpt_iterate(mobile, state, cycles)
+
+
+# Autocomplete
+cmd.auto_arg[0].update({
+    "mutate": cmd.auto_arg[0]["zoom"],
+    "relax": cmd.auto_arg[0]["zoom"],
+    "mutate": cmd.auto_arg[0]["zoom"],
+    "insert": cmd.auto_arg[0]["zoom"],
+    "add_missing_atoms": cmd.auto_arg[0]["zoom"],
+    "update_align": cmd.auto_arg[0]["align"],
+    "sculpt_homolog": cmd.auto_arg[0]["align"],
+})
+cmd.auto_arg[1].update({
+    "mutate": [cmd.Shortcut(three_letter.values()), "residue", ""],
+    "update_align": cmd.auto_arg[1]["align"],
+    "sculpt_homolog": cmd.auto_arg[1]["align"],
+})
+
