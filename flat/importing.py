@@ -19,6 +19,23 @@ import re
 
 
 @cmd.extend
+def load_all(pattern, group='', quiet=1, *, _self=cmd, **kwargs):
+    '''
+    DESCRIPTION
+        Load all files matching given globbing pattern
+    '''
+    # import glob
+    # import os
+    # TODO: Idea structure first, everything else later
+    # filenames = glob.glob(cmd.exp_path(pattern))
+    # for filename in filenames:
+    #     if not quiet:
+    #         print(' Loading ' + filename)
+    #     _self.load(filename, **kwargs)
+    raise NotImplemented
+
+
+@cmd.extend
 def load_csv(filename, selection="(all)", var="b", vis=0, *, _self=cmd):
     """
     DESCRIPTION
@@ -173,75 +190,123 @@ def load_ndx(filename, quiet=0, *, _self=cmd):
 
 
 @cmd.extend
-def save_colored_fasta(file, selection="all", invert=0, *, _self=cmd):
+def load_smi(filename, oname="", discrete=-1, quiet=1, multiplex=None, zoom=-1, _self=cmd):
     """
     DESCRIPTION
-        Save a HTML file with colored (by C-alpha atoms) fasta sequence.
-    USAGE
-        save_colored_fasta file [, selection [, invert ]]]
+        Load a SMILES file with an openbabel backend
+    SOURCE
+        From PSICO (c) 2011 Thomas Holder, MPI for Developmental Biology
     """
-    # See: https://github.com/speleo3/pymol-psico/blob/master/psico/fasta.py
-    from pymol import Scratch_Storage
-    from pymol.exporting import _resn_to_aa as one_letter
+    import tempfile
+    import subprocess
+    import os
 
-    invert = int(invert)
-    selection = f"({selection}) and guide"
+    if not oname:
+        oname = os.path.basename(filename).rsplit(".", 1)[0]
 
-    html = []
-    stored = Scratch_Storage()
+    outfile = tempfile.mktemp(".sdf")
 
-    def callback(resv, resn, color):
-        """ Translate to residue to HTML."""
-        if stored.resv is None:
-            stored.resv = resv - (resv % 70)
-        while stored.resv+1 < resv:
-            callback(stored.resv+1, None, 222)
-        stored.resv += 1
-        if stored.resv % 70 == 1:
-            html.append("<br>")
-
-        rgb = cmd.get_color_tuple(color)
-        rgb = [int(x*255) for x in rgb]
-        aa = one_letter.get(resn, "?") if resn else "-"
-
-        if not resn:
-            color = "#000000"
-            background = ""
-        elif invert:
-            cs = round((rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000)
-            color = "black" if cs > 125 else "white"
-            background = "background-color:#{:02x}{:02x}{:02x}".format(*rgb)
-        else:
-            color = "#{:02x}{:02x}{:02x}".format(*rgb)
-            background = ""
-
-        html.append(
-            f"<span style=color:{color};{background}>{aa}</span>"
-        )
-        if stored.resv % 10 == 0:
-            html.append("<span> </span>")
-        return
-
-    for obj in _self.get_object_list(selection):
-        for chain in _self.get_chains(f"model {obj} and ({selection})"):
-            sele = f"m. {obj} & c. '{chain}' and ({selection})"
-            html.append(f"&gt;{obj}|{chain}")
-            stored.resv = 0
-            _self.iterate(sele, "callback(resv, resn, color)", space=locals())
-            html.append("<br>")
-
-    with open(file, "w") as handle:
-        print("<html><body style='font-family:consolas'>", file=handle)
-        print("".join(html), file=handle)
-        print("</body></html>", file=handle)
-
-    return
+    try:
+        subprocess.check_call(["obabel", filename, "-O", outfile, "--gen3D"])
+        _self.load(outfile, oname, discrete=discrete, quiet=quiet,
+                   multiplex=multiplex, zoom=zoom)
+    finally:
+        os.remove(outfile)
 
 
+@cmd.extend
+def load_aln(filename, object=None, mobile=None, target=None, mobile_id=None,
+             target_id=None, format='', transform=0, quiet=1, *, _self=cmd):
+    '''
+    DESCRIPTION
+        Load a pairwise alignment from file and apply it to two loaded structures.
+    USAGE
+        load_aln filename [, object [, mobile [, target [, mobile_id [, target_id [, format ]]]]]]
+    ARGUMENTS
+        filename = string: alignment file
+        object = string: name of the object {default: filename prefix}
+        mobile, target = string: atom selections {default: ids from alignment file}
+        mobile_id, target_id = string: ids from alignment file {default: first two}
+        format = string: file format, see http://biopython.org/wiki/AlignIO
+        {default: guess from first line in file}
+    SOURCE
+        From PSICO (c) 2011 Thomas Holder, MPI for Developmental Biology
+    EXAMPLE
+        >>> fetch 1bz4 1cpr, async=0
+        >>> super 1bz4 and guide, 1cpr and guide, object=aln1, window=5
+        >>> save /tmp/super.aln, aln1
+        >>> delete aln1
+        >>> load_aln /tmp/super.aln, aln2, format=clustal
+    '''
+    import os
+    from . import one_letter
+    from .seqalign import needle_alignment, alignment_mapping, alignment_read
+
+    quiet = int(quiet)
+    if object is None:
+        object = os.path.basename(filename).rsplit('.', 1)[0]
+
+    # load alignment file
+    alignment = alignment_read(cmd.exp_path(filename), format)
+    aln_dict = dict((record.id, record) for record in alignment)
+    mobile_record = alignment[0] if mobile_id is None else aln_dict[mobile_id]
+    target_record = alignment[1] if target_id is None else aln_dict[target_id]
+
+    # guess selections from sequence identifiers (if not given)
+    if mobile is None:
+        mobile = mobile_record.id
+    if target is None:
+        target = target_record.id
+
+    try:
+        mobile_obj = _self.get_object_list('(' + mobile + ')')[0]
+        target_obj = _self.get_object_list('(' + target + ')')[0]
+    except (
+            IndexError,  # empty list (no atoms in selection)
+            TypeError,  # None (Selector-Error)
+            CmdException,  # future-proofing (Selector-Error)
+    ):
+        raise CmdException(
+            f'selection "{mobile}" or "{target}" does not exist') from None
+
+    # get structure models and sequences
+    mobile_model = _self.get_model('(%s) and guide' % mobile)
+    target_model = _self.get_model('(%s) and guide' % target)
+    mobile_sequence = ''.join(one_letter.get(a.resn, 'X')
+                              for a in mobile_model.atom)
+    target_sequence = ''.join(one_letter.get(a.resn, 'X')
+                              for a in target_model.atom)
+
+    # align sequences from file to structures
+    mobile_aln = needle_alignment(str(mobile_record.seq), mobile_sequence)
+    target_aln = needle_alignment(str(target_record.seq), target_sequence)
+
+    # get index mappings
+    mobile_aln_i2j = dict(alignment_mapping(*mobile_aln))
+    target_aln_i2j = dict(alignment_mapping(*target_aln))
+    record_i2j = alignment_mapping(mobile_record, target_record)
+
+    # build alignment list
+    r = []
+    for i, j, in record_i2j:
+        if i in mobile_aln_i2j and j in target_aln_i2j:
+            i = mobile_aln_i2j[i]
+            j = target_aln_i2j[j]
+            r.append([
+                (mobile_obj, mobile_model.atom[i].index),
+                (target_obj, target_model.atom[j].index),
+            ])
+
+    cmd.set_raw_alignment(object, r, int(transform))
+    return r
+
+
+# Register extensions
 try:
     from pymol.importing import loadfunctions
     loadfunctions.setdefault("csv", load_csv)
     loadfunctions.setdefault("top", load_topol)
     loadfunctions.setdefault("ndx", load_ndx)
+    loadfunctions.setdefault("aln", load_aln)
 except ImportError:
     pass
