@@ -32,6 +32,7 @@ def alignment_mapping(seq1, seq2):
         if a != "-" and b != "-":
             yield i, j
 
+
 def alignment_read(filename, format=None):
     """
     DESCRIPTION
@@ -63,5 +64,28 @@ def alignment_read(filename, format=None):
         return AlignIO.read(handle, format)
 
 
+def needle_alignment(s1, s2):
+    '''
+    DESCRIPTION
+        Does a Needleman-Wunsch Alignment of sequence s1 and s2 and
+        returns a Bio.Align.MultipleSeqAlignment object.
+    SOURCE 
+        From PSICO (c) 2011 Thomas Holder, MPI for Developmental Biology
+    '''
+    from Bio.Align import PairwiseAligner, substitution_matrices, MultipleSeqAlignment
+    from Bio.SeqRecord import SeqRecord
+    from Bio.Seq import Seq
 
-
+    blosum62 = substitution_matrices.load("BLOSUM62")
+    missing_codes = ''.join(set('JUO-.?').difference(blosum62.alphabet))
+    blosum62 = blosum62.select(blosum62.alphabet + missing_codes)
+    aligner = PairwiseAligner(
+        internal_open_gap_score=-10,
+        extend_gap_score=-0.5,
+        substitution_matrix=blosum62
+    )
+    alns = aligner.align(s1, s2)
+    return MultipleSeqAlignment([
+        SeqRecord(Seq(alns[0]), "s1"),
+        SeqRecord(Seq(alns[1]), "s2"),
+    ])
