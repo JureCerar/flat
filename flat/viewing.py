@@ -29,15 +29,15 @@ def beautify(selection="all", mode=0, *, _self=cmd):
         mode = int: Display mode. {default: 0}
     """
     mode = int(mode)
-    cmd.hide("everything", selection)
-    cmd.show("wire", f"{selection} and ! polymer.protein")
-    cmd.show("cartoon", f"{selection} and polymer.protein")
-    cmd.show(
+    _self.hide("everything", selection)
+    _self.show("wire", f"{selection} and ! polymer.protein")
+    _self.show("cartoon", f"{selection} and polymer.protein")
+    _self.show(
         ["licorice", "line"][mode],
         f"((byres ({selection})) & (sc. | (n. CA | n. N & r. PRO)))"
     )
-    cmd.hide(f"({selection} and hydro and (e. C extend 1))")
-    cmd.color("atomic", f"({selection}) and ! e. C")
+    _self.hide(f"({selection} and hydro and (e. C extend 1))")
+    _self.color("atomic", f"({selection}) and ! e. C")
     return
 
 
@@ -195,9 +195,9 @@ def bounding_box(selection="all", state=0, vis=1, color="yellow", quiet=0, *, _s
         bounding_box [ selection [, state [, vis [, color [, quiet ]]]]]
     """
     state, vis, quiet = int(state), int(vis), int(quiet)
-    rgb = cmd.get_color_tuple(color)
+    rgb = _self.get_color_tuple(color)
 
-    xyz = np.array(cmd.get_coords(selection, state)).T
+    xyz = np.array(_self.get_coords(selection, state)).T
 
     # For what this vector magic is see reference bellow:
     #  _notebooks/2021-04-20-3D-Oriented-Bounding-Box.ipynb
@@ -256,7 +256,14 @@ def bounding_box(selection="all", state=0, vis=1, color="yellow", quiet=0, *, _s
             cgo.VERTEX, *box[:, 3], cgo.VERTEX, *box[:, 7],
             cgo.END
         ]
-        name = cmd.get_unused_name("BoundingBox")
-        cmd.load_cgo(obj, name, zoom=0)
+        name = _self.get_unused_name("BoundingBox")
+        _self.load_cgo(obj, name, zoom=0)
 
     return  result
+
+
+# Autocomplete
+cmd.auto_arg[0].update({
+    "beautify": cmd.auto_arg[0]["zoom"],
+    "bounding_box": cmd.auto_arg[0]["zoom"],
+})
