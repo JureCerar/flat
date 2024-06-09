@@ -14,8 +14,6 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from pymol import cmd, CmdException, cgo
-from . import one_letter
-import re
 
 
 @cmd.extend
@@ -28,21 +26,24 @@ def count(selection="all", *, _self=cmd):
     ARGUMENTS
         selection = str: Atom selection. {default: all}
     """
-    # Get properties
+    # Get model
     model = _self.get_model(f"({selection})")
     if not model.atom:
-        print("Empty selection!")
-        return
+        raise CmdException("Empty selection!")
+    # Get properties: mass, num. atoms and residues
     mass = model.get_mass()
-    print("Residue(s): %s" % len(model.get_residues()))
-    print("Atom(s): %s" % model.nAtom)
+    n_residues = len(model.get_residues())
+    n_atoms = model.nAtom
+    # Print out info
+    print(f"Atom(s): {n_atoms}")
+    print(f"Residue(s): {n_residues}")
     if mass < 1e3:
-        print("Mass: %.3f Da" % mass)
+        print(f"Mass: {mass:.3f} Da")
     elif mass < 1e6:
-        print("Mass: %.3f kDa" % (mass/1e3))
+        print(f"Mass: {mass/1e3:.3f} kDa")
     else:
-        print("Mass: %.3f MDa" % (mass/1e6))
-    return
+        print(f"Mass: {mass/1e6:.3f} MDa")
+    return (n_atoms, n_residues, mass)
 
 
 @cmd.extend
@@ -156,16 +157,14 @@ def ext_coef(selection="all", state=-1, *, quiet=0, _self=cmd):
     coef0 = nW * 5500 + nY * 1490
     abs0 = coef0 / mass
     if not quiet:
-        print(
-            "Extinction coefficients are in units of M^-1 cm^-1, at 280 nm measured in water.",
-            "",
-            "Ext. coefficient: {:.0f}".format(coef),
-            "Abs 0.1% (=1 mg/mL): {:.3f}, for native protein.".format(abs),
-            "",
-            "Ext. coefficient: {:.0f}".format(coef0),
-            "Abs 0.1% (=1 mg/mL): {:.3f}, for denatured protein.".format(abs0),
-            sep="\n"
-        )
+        print("Extinction coefficients are in units of M^-1 cm^-1, at 280 nm measured in water.")
+        print("")
+        print(f"Ext. coefficient: {coef:.0f}")
+        print(f"Abs 0.1% (=1 mg/mL): {abs:.3f}, for native protein.")
+        print("")
+        print(f"Ext. coefficient: {coef0:.0f}")
+        print(f"Abs 0.1% (=1 mg/mL): {abs0:.3f}, for denatured protein.")
+
     return ((coef, abs), (coef0, abs0))
 
 
@@ -178,6 +177,7 @@ def get_seq(selection, chainbreak="/", unknown="X", quiet=1, *, _self=cmd):
         get_seq selection [, chainbreak [, unknown ]]
     """
     # See: https://github.com/speleo3/pymol-psico/blob/master/psico/modelling.py#L427
+    from . import one_letter
 
     seq_list = []
     _self.iterate(
@@ -195,7 +195,7 @@ def get_seq(selection, chainbreak="/", unknown="X", quiet=1, *, _self=cmd):
                 if resn in one_letter:
                     yield one_letter[resn]
                 else:
-                    print('Warning: unknown residue "%s"' % (resn))
+                    print(f"Warning: unknown residue '{resn}'")
                     yield unknown
                 prev_resv = resv
     
@@ -204,75 +204,40 @@ def get_seq(selection, chainbreak="/", unknown="X", quiet=1, *, _self=cmd):
     if not quiet:
         print("get_seq:", "".join(seq))
 
-    return ''.join(seq)
+    return "".join(seq)
 
 
 @cmd.extend
-def find_seq(expression, selection="all", name="sele", merge=False, *, _self=cmd):
+def get_ss(selection="all", chainbreak="/", unknown="-",  *, quiet=1, _self=cmd):
     """
     DESCRIPTION
-        Given a sequence/regex to find, select those matching 
-        amino acids in the protein.
+        Get secondary structure of selection as string  
     USAGE
-        find_seq expression, [ selection [, name [, merge ]]]
-    ARGUMENTS
-        expression = str: the sequence of amino acids to match and selection.
-            This can be a sequence of amino acids or a regular expression.  
-        selection = str: a selection-expression. {default: "all"}
-        name = str: a unique name for the selection. {default: "(sele)"}
-        merge = int: merge to existing selection. {default: False}
-    EXAMPLE
-        > find_seq N[^P][TS]
+        get_ss [ selection [, chainbreak [, unknown ]]]
     """
-    merge = bool(merge)
+    res_list = []
+    _self.iterate(
+        f"bca. ({selection})",
+        "res_list.append((resv, ss))",
+        space=locals()
+    )
 
-    # Check input parameters
-    if len(expression) == 0 or not isinstance(expression, str):
-        raise CmdException("Search sequence not provided")
-    if len(selection) == 0 or not isinstance(selection, str):
-        raise CmdException("Invalid selection or object")
-    if len(name) == 0 or not isinstance(name, str):
-        raise CmdException("Invalid name for the selection")
+    seq = list()
+    prev_resv = None
+    for resv, ss in res_list:
+        if resv != prev_resv:
+            if prev_resv is not None and resv != prev_resv + 1:
+                seq.append(chainbreak)
+            if ss in ["S", "H"]:
+                seq.append(ss)
+            else:
+                seq.append(unknown)
+            prev_resv = resv
 
-    # Create a temporary selection
-    sele = _self.get_unused_name("_temp")
-    _self.select(sele, selection)
+    if not int(quiet):
+        print("get_ss:", "".join(seq))
 
-    try:
-        # Iterate over residue selection
-        residues = []
-        _self.iterate(
-            f"bca. ({sele})",
-            "residues.append((resi, resn, chain))",
-            space=locals()
-        )
-
-        # Extract residues IDs, AA string, and chains
-        indices = [_[0] for _ in residues]
-        sequence = ''.join([one_letter.get(_[1], "-") for _ in residues])
-        chains = [_[2] for _ in residues]
-
-        # make an empty selection to which we add residues
-        _self.select(name, 'None', merge=merge)
-
-        regex = re.compile(expression.upper())
-        for m in regex.finditer(sequence):
-            (start, stop) = m.span()
-            # Are all selected residues from one chain?
-            sele_chains = chains[start:stop]
-            if len(set(sele_chains)) != 1:
-                continue
-            # Form a residue selection
-            sele_indices = "+".join(indices[i] for i in range(start, stop))
-            _self.select(
-                name,
-                f"{name} or ({sele} & i. {sele_indices} & c. '{sele_chains[0]}')",
-                merge=merge
-            )
-    finally:
-        _self.delete(sele)
-
-    return name
+    return "".join(seq)
 
 
 @cmd.extend
@@ -578,3 +543,22 @@ def get_contacts(selection1, selection2, name="contacts", cutoff = [3.6, 4.0, 4.
         result = [r / num_states for r in result]
 
     return result
+
+
+# Autocomplete
+cmd.auto_arg[0].update({
+    "count": cmd.auto_arg[0]["zoom"],
+    "length": cmd.auto_arg[0]["zoom"],
+    "get_sasa": cmd.auto_arg[0]["zoom"],
+    "iterate_to_list": cmd.auto_arg[0]["zoom"],
+    "ext_coef": cmd.auto_arg[0]["zoom"],
+    "get_seq": cmd.auto_arg[0]["zoom"],
+    "get_ss": cmd.auto_arg[0]["zoom"],
+    "get_dipole": cmd.auto_arg[0]["zoom"],
+    "get_longest_distance": cmd.auto_arg[0]["zoom"],
+    "get_contacts": cmd.auto_arg[0]["zoom"],
+})
+cmd.auto_arg[1].update({
+    "iterate_to_list": cmd.auto_arg[0]["spectrum"],
+    "get_contacts": cmd.auto_arg[0]["zoom"],
+})
