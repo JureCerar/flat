@@ -15,6 +15,7 @@
 
 from pymol import cmd, menu
 import itertools
+import collections
 
 # Custom color cycle (only 9 colors)
 _color_cycle = [
@@ -57,7 +58,7 @@ def cbo(selection="(all)", *, _self=cmd):
     """
     color = itertools.cycle(_color_cycle)
     for obj in cmd.get_names("public_objects", 0, selection):
-        _self.color(next(color), f"({selection}) & %{obj} & e. C")
+        _self.color(next(color), f"({selection}) & %{obj}")
     return
 
 
@@ -71,7 +72,7 @@ def cbc(selection="(all)", *, _self=cmd):
     """
     colors = itertools.cycle(_color_cycle)
     for chain in _self.get_chains(selection):
-        _self.color(next(colors), f"({selection}) & c. {chain} & e. C")
+        _self.color(next(colors), f"({selection}) & c. '{chain}'")
     return
 
 
@@ -79,7 +80,7 @@ def cbc(selection="(all)", *, _self=cmd):
 def cbe(selection="(all)", *, _self=cmd, **kwargs):
     """
     DESCRIPTION
-        Color by elements
+        Color by elements. By default skips coloring carbons.
     USAGE
         cbe [ selection [, <element>=<color> ]]
     EXAMPLE
@@ -90,7 +91,7 @@ def cbe(selection="(all)", *, _self=cmd, **kwargs):
     _self.color("red", f"({selection}) & e. O")
     _self.color("yellow", f"({selection}) & e. S")
     for element, color in kwargs.items():
-        _self.color(color, f"(({selection}) & e. {element})")
+        _self.color(color, f"({selection}) & e. {element}")
     return
 
 
@@ -129,6 +130,23 @@ def cbattr(selection="(all)", *args, _self=cmd):
 
 
 @cmd.extend
+def cbalpha(selection="(all)", *, _self=cmd):
+    """
+    DESCRIPTION
+        Color by C alpha atom.
+    USAGE
+        cbalpha [selection]
+    """
+    color_list = collections.defaultdict(lambda: 25) # gray is default
+    _self.iterate(f"bca. ({selection})",
+                  "color_list[object,segi,chain,resi] = color", space=locals())
+    _self.alter(selection,
+                "color = color_list[object,segi,chain,resi]", space=locals())
+    _self.recolor()
+    return
+
+
+@cmd.extend
 def set_colors(scheme, *, _self=cmd):
     """
     DESCRIPTION
@@ -149,8 +167,40 @@ def set_colors(scheme, *, _self=cmd):
         _self.recolor()
 
 
+@cmd.extend
+def get_colors(selection="(all)", *, quiet=1, _self=cmd):
+    """
+    DESCRIPTION
+        Get color of atoms in selection. Returns list of indices and RGB tuples.
+    USAGE
+        get_colors [selection [, quiet ]]
+    PYMOL API
+        get_colors(selection) -> [(index, (r, g, b)), ... ]
+    """
+    color_list = []
+    get_color_tuple = _self.get_color_tuple
+    _self.iterate(selection,
+                  "color_list.append((index, get_color_tuple(color)))", space=locals())
+    if not quiet:
+        for index, color in color_list:
+            print(index, color)
+    return color_list
+    
+
+# Autocompletion
+_ator_arg1_select = cmd.auto_arg[1]["select"]
+cmd.auto_arg[0].update({
+    "cbo": _ator_arg1_select,
+    "cbc": _ator_arg1_select,
+    "cbe": _ator_arg1_select,
+    "cbattr": _ator_arg1_select,
+    "cbalpha": _ator_arg1_select,
+    "get_colors": _ator_arg1_select,
+})
+
+
 class _Palette:
-    """ Dummy class """
+    """ Dummy class for color palettes """
     pass
 
 
