@@ -113,7 +113,7 @@ def set_charges_and_radii(obj_name, quiet=1, *, _self=cmd):
 def get_vacuum_esp(selection, mode=2, cutoff=10.0, *, _self=cmd):
     """
     DESCRIPTION
-        Calculate vacuum electrostatic potential map.
+        Calculate vacuum  potential map.
     USAGE
         get_vacuum_esp selection [, mode [, border [, quiet ]]]
     ARGUMENTS
@@ -123,6 +123,8 @@ def get_vacuum_esp(selection, mode=2, cutoff=10.0, *, _self=cmd):
             1: coulomb_neutral map, no cutoff
             2: coulomb_local, cutoff
         cutoff = float: Calculation cutoff value {default: 10.0}
+    SOURCE
+        From PSICO (c) 2012 Thomas Holder
     """
     if (selection.split() != [selection] or
             selection not in cmd.get_names('objects')):
@@ -170,3 +172,12 @@ def get_vacuum_esp(selection, mode=2, cutoff=10.0, *, _self=cmd):
     cmd.show("surface", obj_name)
     cmd.set("surface_color", pot_name, obj_name)
     cmd.set("surface_ramp_above_mode", 1, obj_name)
+
+
+# Autocomplete
+cmd.auto_arg[0].update({
+    "sum_formal_charges": cmd.auto_arg[0]["zoom"],
+    "sum_partial_charges": cmd.auto_arg[0]["zoom"],
+    "set_charges_and_radii": cmd.auto_arg[0]["copy"],
+    "get_vacuum_esp": cmd.auto_arg[0]["zoom"],
+})
