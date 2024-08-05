@@ -14,7 +14,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from pymol import cmd, CmdException, cgo
-
+import numpy as np
 
 @cmd.extend
 def count(selection="all", *, _self=cmd):
@@ -254,7 +254,6 @@ def get_dipole(selection="all", state=0, var="formal_charge", vis=1, quiet=1, *,
         var = str: Property used for calculation. {default: "formal_charge"}
         vis = int: Visualize output. {default: 1}
     """
-    import numpy as np
     state, vis, quiet = int(state), int(vis), int(quiet)
 
     bfact = []
@@ -307,6 +306,43 @@ def get_dipole(selection="all", state=0, var="formal_charge", vis=1, quiet=1, *,
 
 
 @cmd.extend
+def rgyro(selection="all", state=0, vis=1, *, quiet=1, _self=cmd):
+    """
+    DESCRIPTION
+        ...
+    USAGE
+        rgyro [ selection [, state [, vis ]]]
+    ARGUMENTS
+        selection = str: Atom selection {default: all}
+        state = int: Object state (0 for current state). {default: 0}
+        vis = int: Visualize output. {default: 1}
+    """
+    state, vis, quiet = int(state), int(vis), int(quiet)
+
+    model = cmd.get_model(selection, state).atom
+    xyz = np.array([i.coord for i in model])
+    mass = np.array([i.get_mass() for i in model])
+    com = cmd.centerofmass(selection, state)    
+
+    r2 = np.sum((xyz - com) ** 2, axis=1)
+    rog = np.sqrt(np.sum(mass * r2) / np.sum(mass))
+
+    if not quiet:
+        print(
+            " Util: radius_of_gyration =",
+            np.array2string(rog, precision=3), "Å"
+        )
+
+    if vis:
+        object = "rog"
+        cmd.pseudoatom(object, pos=com, state=state, vdw=rog)
+        cmd.show("spheres", object)
+        cmd.set("sphere_transparency", 0.5, object)
+
+    return rog
+
+
+@cmd.extend
 def get_longest_distance(selection="(all)", vis=1, *, _self=cmd):
     """
     DESCRIPTION
@@ -314,7 +350,6 @@ def get_longest_distance(selection="(all)", vis=1, *, _self=cmd):
     USAGE
         get_longest_distance [ selection [, vis ]]
     """
-    import numpy as np
     from scipy import spatial
 
     xyz = np.array(_self.get_coords(selection, 1))
@@ -357,7 +392,7 @@ def get_raw_distances(names='', state=1, selection='all', quiet=1, *, _self=cmd)
     SEE ALSO
         select_distances, cmd.find_pairs, cmd.get_raw_alignment
     """
-    from chempy import cpv
+    from pymol.chempy import cpv
 
     state, quiet = int(state), int(quiet)
     if state < 1:
