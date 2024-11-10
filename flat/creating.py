@@ -49,7 +49,7 @@ aromatic_center_atoms = {
 
 
 @cmd.extend
-def sidechain_centers(object="sidechain_centers", selection="all", method="bahar1996", name="PS1", *, _self=cmd):
+def sidechain_centers(selection="all", object="sidechain_centers", method="bahar1996", name="PS1", *, _self=cmd):
     """
     DESCRIPTION
         Creates an object with sidechain representing pseudoatoms for each residue
@@ -119,7 +119,7 @@ def sidechain_centers(object="sidechain_centers", selection="all", method="bahar
 
 
 @cmd.extend
-def aromatic_centers(object="aromatic_centers", selection="all", name="PS1", *, _self=cmd):
+def aromatic_centers(selection="all", object="aromatic_centers", name="PS1", *, _self=cmd):
     """
     DESCRIPTION
         Creates an object with pseudoatoms representing atomatic centers for 
@@ -161,11 +161,46 @@ def aromatic_centers(object="aromatic_centers", selection="all", name="PS1", *, 
     return model
 
 
+@cmd.extend
+def com(selection="all", object=None, state=0, *, quiet=1, _self=cmd):
+    """
+    DESCRIPTION
+        Calculates the center of mass. Considers atom mass and occupancy.
+    USAGE
+        com [object [, selection [, name ]]]
+    ARGUMENTS
+        selection = string: atoms to consider {default: (all)}
+        object = string: name of object to create {default: None}
+        state = int: object state, -1 for current state, 0 for all states {default: 0}
+    """
+    state, quiet = int(state), int(quiet)
+    if (object == None):
+        try:
+            object = _self.get_legal_name(selection)
+            object = _self.get_unused_name(object + "_COM", 0)
+        except AttributeError:
+            object = "COM"
+    _self.delete(object)
+
+    if (state != 0):
+        x, y, z = _self.centerofmass(selection, state=state)
+        _self.pseudoatom(object, pos=[x, y, z])
+        _self.show("spheres", object)
+        
+    else:
+        for i in range(_self.count_states()):
+            x, y, z = _self.centerofmass(selection, state=i+1)
+            _self.pseudoatom(object, pos=[x, y, z], state=i+1)
+            _self.show("spheres", object)
+
+
 # Autocomplete
-cmd.auto_arg[1].update({
+cmd.auto_arg[0].update({
     "sidechain_centers": cmd.auto_arg[0]["zoom"],
     "aromatic_centers": cmd.auto_arg[0]["zoom"],
+    "com": cmd.auto_arg[0]["zoom"],
 })
+
 cmd.auto_arg[2].update({
     "sidechain_centers": [cmd.Shortcut(sidechain_center_methods), "method", ""],
 })
