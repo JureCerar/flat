@@ -14,9 +14,11 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from pymol import cmd, CmdException
+import io
 
 
 def get_fixed_indices(selection, state, _self):
+    """Fix pymol idices"""
     fixed_list = []
     _self.iterate_state(
         state,
@@ -27,25 +29,22 @@ def get_fixed_indices(selection, state, _self):
     return [idx for (idx, fixed) in enumerate(fixed_list) if fixed]
 
 
-def load_or_update(molstr, name, sele, state, _self):
+def load_or_update(molstr, name, fmt, sele, state, _self):
+    """Load or update structure of existing object"""
     with _self.lockcm:
-        _load_or_update(molstr, name, sele, state, _self)
+        update = not name
 
+        if update:
+            name = _self.get_unused_name("_minimized")
+        else:
+            _self.delete(name)
 
-def _load_or_update(molstr, name, sele, state, _self):
-    update = not name
+        _self.load_raw(molstr, fmt, name, 1, zoom=0)
+        _self.fit(name, sele, 1, state, cycles=5, matchmaker=-1)
 
-    if update:
-        name = _self.get_unused_name("_minimized")
-    else:
-        _self.delete(name)
-
-    _self.load_raw(molstr, "mol", name, 1, zoom=0)
-    _self.fit(name, sele, 1, state, cycles=5, matchmaker=-1)
-
-    if update:
-        _self.update(sele, name, state, 1, matchmaker=0)
-        _self.delete(name)
+        if update:
+            _self.update(sele, name, state, 1, matchmaker=0)
+            _self.delete(name)
 
 
 def randomize_coords_if_collapsed(selection, state, fancy=True, _self=cmd):
@@ -156,7 +155,7 @@ def minimize_ob(selection="enabled", state=-1, ff="UFF", nsteps=500,
             mol.DeleteAtom(mol.GetAtomById(hydro_id))
 
         molstr = obconversion.WriteString(mol)
-        load_or_update(molstr, name, sele, state, _self)
+        load_or_update(molstr, name, "mol", sele, state, _self)
 
         if not int(quiet):
             print(" Energy: %8.2f %s" % (ff.Energy(), ff.GetUnit()))
@@ -224,10 +223,76 @@ def minimize_rdkit(selection="enabled", state=-1, ff="MMFF94", nsteps=500,
             print(" Warning: minimization did not converge")
 
         molstr = Chem.MolToMolBlock(mol)
-        load_or_update(molstr, name, sele, state, _self)
+        load_or_update(molstr, name, "mol", sele, state, _self)
 
         if not int(quiet):
             print(" Energy: %8.2f %s" % (ff.CalcEnergy(), "kcal/mol"))
+    finally:
+        _self.delete(sele)
+
+
+@cmd.extend
+def minimize_mm(selection="enabled", state=-1, ff="amber14-all.xml", nsteps=500,
+                   name="", quiet=1, _self=cmd):
+    """
+    DESCRIPTION
+        Energy minimization with OpenMM. Supports fixed atoms (flag fix)
+    USAGE
+        minimize [selection [, state [, ff [, nsteps [, ... ]]]]] 
+    ARGUMENTS
+        selection = str: atom selection {default: enabled}
+        state = int: object state {default: -1}
+        ff = str: OpenMM force field {default: amber14-all.xml}
+        nsteps = int: number of steps {default: 200}
+    """
+    import openmm
+    import openmm.app
+
+    state, nsteps = int(state), int(nsteps)
+
+    sele = _self.get_unused_name("_sele")
+    natoms = _self.select(sele, selection, 0)
+
+    try:
+        if natoms == 0:
+            raise CmdException("empty selection")
+        
+        # Pass structure to OpenMM
+        molstr = cmd.get_str("pdb", sele, state)
+        with io.StringIO(molstr) as f:
+            structure = openmm.app.PDBFile(f)
+
+        # Fix configuration
+        modeller = openmm.app.Modeller(structure.topology, structure.positions)
+        modeller.addHydrogens()
+
+        # Construct MD system
+        forcefield = openmm.app.ForceField(ff)
+        system = forcefield.createSystem(
+            modeller.topology,
+            nonbondedCutoff=3*openmm.unit.nanometer,
+            constraints=openmm.app.HBonds,
+        )
+        integrator = openmm.LangevinIntegrator(
+            300 * openmm.unit.kelvin,
+            1 / openmm.unit.picosecond,
+            2 * openmm.unit.femtosecond,
+        )
+
+        # Run minimization
+        simulation = openmm.app.Simulation(modeller.topology, system, integrator)
+        simulation.context.setPositions(modeller.positions)
+        simulation.minimizeEnergy(maxIterations=nsteps)
+
+        # Get minimized structure
+        final = simulation.context.getState(getPositions=True, getEnergy=True)
+        with io.StringIO() as f:
+            openmm.app.PDBFile.writeFile(simulation.topology, final.getPositions(), f)
+            load_or_update(f.getvalue(), name, "pdb", sele, state, _self)
+
+        if not int(quiet):
+            print(f" Energy: {final.getPotentialEnergy()}")
+
     finally:
         _self.delete(sele)
 
@@ -236,4 +301,5 @@ def minimize_rdkit(selection="enabled", state=-1, ff="MMFF94", nsteps=500,
 cmd.auto_arg[0].update({
     "minimize_ob": cmd.auto_arg[0]["zoom"],
     "minimize_rdkit": cmd.auto_arg[0]["zoom"],
+    "minimize_mm": cmd.auto_arg[0]["zoom"],
 })

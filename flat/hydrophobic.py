@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from pymol import cmd, CmdException
+from pymol import cmd, CmdException, cgo
 import collections
 import numpy as np
 
@@ -125,63 +125,105 @@ def hydropathy(selection="(all)", method="Black-Mould", vis=1, *, _self=cmd):
 
 
 @cmd.extend
-def hydropathy_moment(selection="(all)", method="Black-Mould", state=1, quiet=1, *, _self=cmd):
+def hydropathy_moment(selection="(all)", method="Black-Mould", state=1, vis=1, *, quiet=1, _self=cmd):
     """
     DESCRIPTION
         Get first-order hydrophobic moment vector for selection.
     USAGE
-        hydropathy_moment [ selection [, method [, state ]]]
+        hydropathy_moment [ selection [, method [, state [, vis ]]]]
     ARGUMENTS
         selection = str: Atom selection. {default: all}
         method = str: Hydrophobic scale. {default: 'Black-Mould'}
+        vis = bool: Visualize result {default: True}
     LITERATURE
         B.D. Silverman, PNAS, 2001, 98(9), 4996-5001. doi:10.1073/pnas.081086198
-    SEE ALSO
-        hydropathy
     """
-    # vis = int(vis)
+    vis, state, quiet = int(vis), int(state), int(quiet)
 
-    if len(_self.get_object_list(selection)) > 1:
+    if len(_self.get_object_list(selection)) != 1:
         raise CmdException("Multiple object in selection.")
 
+    # Get list of residues
+    atoms = _self.get_model(selection).atom
+    residues = set(
+        (a.segi, a.chain, a.resn, a.resi) for a in atoms)
+    n_residues = len(residues)
+
+    # Get dictionary of hydrophobic indices
     if not method.lower() in _hydro_moment:
         raise CmdException(f"Unknown method: '{method}'")
-    hpi = _hydro_moment.get(method.lower()).copy()
+    hydro_dict = _hydro_moment.get(method.lower()).copy()
 
-    vmin, vmax = min(hpi.values()), max(hpi.values())
-    for key, val in hpi.items():
-        hpi[key] = (val - vmin) / (vmax - vmin) - 0.5
+    # Assign hydrophobic index
+    hydro = list()
+    for segi, chain, resn, resi in residues:
+        if resn not in hydro_dict.keys():
+            print(
+                f"Warning: Cannot assign hydrophobic index to residue: '{resn}'")
+        # Default hydrophobicity value is zero?
+        hydro.append(hydro_dict.get(resn, 0.0))
+    hydro = np.array(hydro)
 
-    # Get C-alpha coordinates, center-of-mass, and hydrophobic index  
-    resn_list = list()
-    _self.iterate(f"bca. ({selection})",
-                "resn_list.append(resn)", space=locals())
-    hydro = np.array([hpi[res] for res in resn_list])
-    xyz = _self.get_coords(f"bca. ({selection})", state)
-    com = np.array(_self.centerofmass(f"bca. ({selection})", state))
+    # Get residues and molecule center of mass
+    com = _self.centerofmass(selection, state=state)
+    xyz = list()
+    for segi, chain, resn, resi in residues:
+        xyz.append(
+            _self.centerofmass(f"//{segi}/{chain}/{resi}", state))
+    xyz = np.array(xyz)
 
-    # Calculate Solvent accessible surface area per residue
+    # Get residue SASA
     tmp = _self.get_unused_name("_tmp")
     _self.create(tmp, selection, state, 1, zoom=0, quiet=1)
     try:
         _self.set("dot_solvent", 1, tmp)
         _self.set("dot_density", 4, tmp)
-        sasa = collections.defaultdict(float)
-        # NOTE: Original equation uses SASA not RSASA
-        # _self.get_area(tmp, load_b=1)
-        _self.get_sasa_relative(tmp, state, vis=0, quiet=1)
-        _self.iterate(tmp, "sasa[segi,chain,resi] += b", space=locals())
-        sasa = np.array(list(sasa.values()))
+        sasa_dict = collections.defaultdict(float)
+        _self.get_area(tmp, 1, load_b=1)
+        _self.iterate(tmp, "sasa_dict[segi,chain,resi]+=b", space=locals())
+        sasa = list()
+        # Retain correct order of variables
+        for segi, chain, resn, resi in residues:
+            sasa.append(sasa_dict[segi, chain, resi])
+        sasa = np.array(sasa)
     finally:
         _self.delete(tmp)
 
     # Calculate hydrophobic moment
     hydro_moment = np.zeros(3)
-    for i in range(xyz.shape[0]):
-        hydro_moment += sasa[i] * hydro[i] * (xyz[i] - com)
+    for i in range(n_residues):
+        hydro_moment += hydro[i] * sasa[i] * (xyz[i] - com)
 
     if not quiet:
-        print(hydro_moment, np.linalg.norm(hydro_moment))
+        print(
+            " Util: hydro_moment =",
+            f"{np.linalg.norm(hydro_moment):.3f}",
+            np.array2string(hydro_moment, precision=2)
+        )
+
+    if vis:
+        color1 = _self.get_color_tuple("green")
+        color2 = _self.get_color_tuple("orange")
+
+        # Scale arrow shape
+        radius = 0.5
+        hlength = radius * 3.0
+        hradius = hlength * 0.6
+
+        vmin, vmax = _self.get_extent(selection, state)
+        norm = np.linalg.norm(np.array(vmax) - np.array(vmin))
+        v = hydro_moment / np.linalg.norm(hydro_moment) * norm / 2
+
+        xyz1 = com - v
+        xyz2 = com + v
+        xyz3 = xyz2 + v / np.linalg.norm(v) * hlength
+
+        name = _self.get_unused_name("hydro_moment")
+        obj = [
+            cgo.CYLINDER, *xyz1, *xyz2, radius, *color1, *color2,
+            cgo.CONE, *xyz2, *xyz3, hradius, 0.0, *color2, *color2, 1.0, 0.0,
+        ]
+        _self.load_cgo(obj, name, state=state, zoom=1)
 
     return hydro_moment
 

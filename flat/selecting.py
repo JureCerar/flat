@@ -17,13 +17,13 @@ from pymol import cmd, CmdException
 
 
 @cmd.extend
-def select_seq(pattern, selection="all", name="sele", merge=False, *, _self=cmd):
+def find_seq(pattern, selection="all", name="sele", merge=False, *, _self=cmd):
     """
     DESCRIPTION
         Given a sequence/regex to find, select those matching 
         amino acids in the protein.
     USAGE
-        select_seq pattern, [ selection [, name [, merge ]]]
+        find_seq pattern, [ selection [, name [, merge ]]]
     ARGUMENTS
         pattern = str: the sequence of amino acids to match and selection.
             This can be a sequence of amino acids or a regular expression.  
@@ -31,7 +31,7 @@ def select_seq(pattern, selection="all", name="sele", merge=False, *, _self=cmd)
         name = str: a unique name for the selection. {default: "sele"}
         merge = int: merge to existing selection. {default: False}
     EXAMPLE
-        >>> select_seq N[^P][TS]
+        >>> find_seq N[^P][TS]
     """
     from . import one_letter
     import re
@@ -177,7 +177,7 @@ cmd.auto_arg[0].update({
     "symdiff": cmd.auto_arg[0]["align"],
 })
 cmd.auto_arg[1].update({
-    "select_seq": cmd.auto_arg[1]["select"],
+    "find_seq": cmd.auto_arg[1]["select"],
     "diff": cmd.auto_arg[1]["align"],
     "symdiff": cmd.auto_arg[1]["align"],
 })

@@ -16,6 +16,7 @@
 from pymol import cmd, CmdException
 import collections
 import sys
+import io
 from . import three_letter
 
 
@@ -291,6 +292,54 @@ def add_missing_atoms(selection, sculpt=0, cycles=100, *, _self=cmd):
 
 
 @cmd.extend
+def fix_h(selection="all", *, _self=cmd):
+    """
+    DESCRIPTION
+        Adds hydrogens with correct names onto a molecule using OpenMM based on known templates.
+    USAGE
+        fix_h [selection]
+    PARAMETERS
+        selection = str: atom selection {default: all}
+    NOTES
+        It's a kludge and may need some love and persuasion to work. This adds hydrogens based
+        on template i.e. it will most likely only work for proteins, sugars, and DNA/RNA. Also
+        needs to have well defined C- and N-terminus.  
+    """
+    import openmm
+    import openmm.app
+
+    if _self.get_model(selection).nAtom == 0:
+        raise CmdException("Empty selection")
+
+    objects = _self.get_object_list(selection)
+    if len(objects) != 1:
+        raise CmdException("Multiple objects in selection")
+
+    # Pass structure to OpenMM with no hydrogens
+    molstr = _self.get_str("pdb", f"({selection}) and ! hydrogen", -1)
+    with io.StringIO(molstr) as f:
+        structure = openmm.app.PDBFile(f)
+
+    # Use modeller to add hydrogens from template
+    modeller = openmm.app.Modeller(structure.topology, structure.positions)
+    modeller.addHydrogens()
+
+    # Load structure back
+    with io.StringIO() as f:
+        openmm.app.PDBFile.writeFile(modeller.topology, modeller.positions, f)
+        molstr = f.getvalue()
+
+    # Replace original structure
+    tmp = _self.get_unused_name("_tmp")
+    try:
+        _self.load_raw(molstr, "pdb", tmp, 0, zoom=0)
+        _self.remove(selection)
+        _self.copy_to(objects[0], tmp, "", zoom=0)
+    finally:
+        _self.delete(tmp)
+
+
+@cmd.extend
 def update_align(mobile, target, state=1, *, fix="none", quiet=1, _self=cmd):
     """
     DESCRIPTION
@@ -357,6 +406,7 @@ cmd.auto_arg[0].update({
     "mutate": cmd.auto_arg[0]["zoom"],
     "insert": cmd.auto_arg[0]["zoom"],
     "add_missing_atoms": cmd.auto_arg[0]["zoom"],
+    "fix_h": cmd.auto_arg[0]["zoom"],
     "update_align": cmd.auto_arg[0]["align"],
     "sculpt_homolog": cmd.auto_arg[0]["align"],
 })
