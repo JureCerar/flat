@@ -20,7 +20,7 @@ FLAT is a collection of scripts and utilities for PyMOL molecular visualizer.
 __author__ = "Jure Cerar"
 __copyright__ = "Copyright (C) 2023-2024 Jure Cerar"
 __license__ = "GNU GPL v3.0"
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 try:
     from pymol import cmd
