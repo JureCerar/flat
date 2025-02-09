@@ -620,6 +620,8 @@ cmd.auto_arg[0].update({
     "get_seq": cmd.auto_arg[0]["zoom"],
     "get_ss": cmd.auto_arg[0]["zoom"],
     "get_dipole": cmd.auto_arg[0]["zoom"],
+    "density": cmd.auto_arg[0]["zoom"],
+    "rgyro": cmd.auto_arg[0]["zoom"],
     "get_longest_distance": cmd.auto_arg[0]["zoom"],
     "get_contacts": cmd.auto_arg[0]["zoom"],
 })
