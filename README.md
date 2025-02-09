@@ -1,6 +1,10 @@
+<p align="center">
+    <img src="docs/flatcat.png" alt="adjust" width="300">
+</p> 
+
 # FLAT - PyMOL Script Collection
 
-_flat_ is a collection of scripts and utilities for PyMOL molecular visualizer. It is heavily inspired and borrows code from [Pymol ScrIpt COllection (PSICO)](https://github.com/speleo3/pymol-psico).
+_FLAT_ is personal collection of scripts and utilities for PyMOL molecular visualizer. The inspiration behind the library is to learn how to work with PyMOL and create a collection of useful functions for easy and convenient use. It is heavily inspired and borrows (_shamelessly steals_) code from [Pymol ScrIpt COllection (PSICO)](https://github.com/speleo3/pymol-psico).
 
 ## Installation
 
@@ -10,7 +14,7 @@ In you python environment move into flat directory and run:
 pip install .
 ```
 
-To activate all _flat_ commands in PyMOL, add this to your `~/.pymolrc.py` file (or add it in PyMOL under `File` → `Edit pymolrc`):
+To activate all _FLAT_ commands in PyMOL, add this to your `~/.pymolrc.py` file or add it in PyMOL under `File` → `Edit pymolrc`:
 
 ```python
 import flat.fullinit
@@ -20,7 +24,7 @@ import flat.fullinit
 
 This program is licensed under the GNU General Public License v3.0
 
-Copyright (C) 2023-2024 [Jure Cerar](https://github.com/JureCerar)
+Copyright (C)  2023-2025 [Jure Cerar](https://github.com/JureCerar)
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 

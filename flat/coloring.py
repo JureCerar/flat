@@ -257,33 +257,23 @@ menu.all_colors_list.append(
     ]),
 )
 
-# Novartis NEW colors and palettes 
-palette.nvs_blue = _Colors("nvs.novartis", "nvs.turquoise")
-palette.nvs_blue_rev = _Colors("nvs.turquoise", "nvs.novartis")
-palette.nvs_purple = _Colors("nvs.purple", "nvs.coral")
-palette.nvs_purple_rev = _Colors("nvs.coral", "nvs.purple")
+# Novartis colors and palettes 
 palette.nvs_coral = _Colors("nvs.coral", "nvs.amber")
 palette.nvs_coral_rev = _Colors("nvs.amber", "nvs.coral")
-cmd.set_color("nvs.novartis", [4, 96, 169])  #0460a9
-cmd.set_color("nvs.carmine", [141, 21, 27])
-cmd.set_color("nvs.sienna", [231, 74, 33])
-cmd.set_color("nvs.apricot", [236, 154, 30])
-cmd.set_color("nvs.deep", [0, 32, 104]) #002068
-cmd.set_color("nvs.coral", [255, 88, 93])  # ff585d
-cmd.set_color("nvs.purple", [143, 45, 222])  # 8f2dde
-cmd.set_color("nvs.turquoise", [80, 226, 208])  # 50e2d0
-cmd.set_color("nvs.amber", [255, 193, 0])  # ffc100
+cmd.set_color("nvs.blue", [4, 96, 169])  #0460a9
+cmd.set_color("nvs.deep", [0, 32, 104])  #002068
+cmd.set_color("nvs.coral", [255, 88, 93])  #ff585d
+cmd.set_color("nvs.amber", [255, 193, 0])  #ffc100
+cmd.set_color("nvs.light", [208, 208, 208])  #d0d0d0
+cmd.set_color("nvs.gray", [167, 167, 167])  #a7a7a7
 menu.all_colors_list.append(
     ("novartis", [
-        ("036", "nvs.novartis"),
-        ("501", "nvs.carmine"),
-        ("921", "nvs.sienna"),
-        ("961", "nvs.apricot"),
+        ("036", "nvs.blue"),
         ("014", "nvs.deep"),
         ("933", "nvs.coral"),
-        ("518", "nvs.purple"),
-        ("388", "nvs.turquoise"),
         ("970", "nvs.amber"),
+        ("777", "nvs.light"),
+        ("555", "nvs.gray"),
     ]),
 )
 

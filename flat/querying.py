@@ -306,6 +306,36 @@ def get_dipole(selection="all", state=0, var="formal_charge", vis=1, quiet=1, *,
 
 
 @cmd.extend
+def density(selection="all", state=0, *, quiet=1, _self=cmd):
+    """
+    DESCRIPTION
+        Calculate density of current state
+    USAGE
+       density [ selection [, state ]]
+    ARGUMENTS
+        selection = str: Atom selection {default: all}
+        state = int: Object state (0 for current state). {default: 0}
+    """
+    if not state:
+        state = _self.get_state()
+
+    model = _self.get_model(selection, state)
+    symmetry = _self.get_symmetry(selection, state)
+
+    if not symmetry:
+        raise ValueError("No symmetry defined")
+
+    volume = np.array(symmetry[0:3]).prod()
+    mass = model.get_mass()
+    density = mass / volume / 6.022 * 10 ** 4 
+
+    if not quiet:
+        print(f"Util: density = {density:.3f} kg/m^3")
+
+    return density
+
+
+@cmd.extend
 def rgyro(selection="all", state=0, vis=1, *, quiet=1, _self=cmd):
     """
     DESCRIPTION
@@ -590,6 +620,8 @@ cmd.auto_arg[0].update({
     "get_seq": cmd.auto_arg[0]["zoom"],
     "get_ss": cmd.auto_arg[0]["zoom"],
     "get_dipole": cmd.auto_arg[0]["zoom"],
+    "density": cmd.auto_arg[0]["zoom"],
+    "rgyro": cmd.auto_arg[0]["zoom"],
     "get_longest_distance": cmd.auto_arg[0]["zoom"],
     "get_contacts": cmd.auto_arg[0]["zoom"],
 })
