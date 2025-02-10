@@ -133,11 +133,8 @@ def anarci(selection="(all)", scheme="chothia", name="CDR", filename=None, exe="
     # but I must then call an executable script and not module.
 
     # TODO: Implement residue renaming based on ANARCI output
-
     # TODO: Figure our how to deal with really short sequences
-
     # TODO: Implement saving ANARCI output to file
-
     # TODO: implement passing other variables to anarci
     # --restrict {ig,tr,heavy,light,H,K,L,A,B}
     # --assign_germline
