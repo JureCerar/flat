@@ -181,7 +181,7 @@ def axis(name="axis", *, _self=cmd):
 
     # Display
     PutCenterCallback(name, 1).load()
-    cmd.load_cgo(obj, name)
+    _self.load_cgo(obj, name, zoom=0)
 
     return
 
@@ -262,8 +262,76 @@ def bounding_box(selection="all", state=0, vis=1, color="yellow", quiet=0, *, _s
     return  result
 
 
+@cmd.extend
+def gridbox(selection="(all)", grid=(5, 5, 5), color="white", lw=2.0, *, _self=cmd):
+    """
+    DESCRIPTION
+        Given selection, draw a grid box around it.
+    USAGE
+        gridbox [selection [, grid [, color ]]] 
+    ARGUMENTS
+        selection = str: Atom selection {default: all}
+        grid = list: Number of grids on X, Y, and Z axis {default: [5, 5, 5]}
+        color = str: Color of the grid {default: white}
+    """
+    vmin, vmax = np.array(_self.get_extent(selection))
+
+    if _self.is_string(grid):
+        grid = _self.safe_list_eval(grid)
+    if color and isinstance(color, str):
+        color = _self.get_color_tuple(color)
+    grid = np.array(grid, dtype=int)
+    if grid.size != 3:
+        raise ValueError("Grid must be length 3")   
+
+    dv = (vmax - vmin) / grid
+    obj = [
+        cgo.LINEWIDTH, float(lw),
+        cgo.BEGIN, cgo.LINES,
+    ]
+    if color:
+        obj.extend([cgo.COLOR, *color])
+
+    for i in range(grid[0]):
+        for j in range(grid[1]):
+            for k in range(grid[2]):
+                obj.extend([
+                    cgo.VERTEX, vmin[0]+i*dv[0], vmin[1]+j*dv[1], vmin[2]+k*dv[2],
+                    cgo.VERTEX, vmin[0]+i*dv[0], vmin[1]+j*dv[1], vmin[2]+(k+1)*dv[2],
+                    cgo.VERTEX, vmin[0]+i*dv[0], vmin[1]+(j+1)*dv[1], vmin[2]+k*dv[2],
+                    cgo.VERTEX, vmin[0]+i*dv[0], vmin[1]+(j+1)*dv[1], vmin[2]+(k+1)*dv[2],
+                    cgo.VERTEX, vmin[0]+(i+1)*dv[0], vmin[1]+j*dv[1], vmin[2]+k*dv[2],
+                    cgo.VERTEX, vmin[0]+(i+1)*dv[0], vmin[1]+j*dv[1], vmin[2]+(k+1)*dv[2],
+                    cgo.VERTEX, vmin[0]+(i+1)*dv[0], vmin[1]+(j+1)*dv[1], vmin[2]+k*dv[2],
+                    cgo.VERTEX, vmin[0]+(i+1)*dv[0], vmin[1]+(j+1)*dv[1], vmin[2]+(k+1)*dv[2],
+                    cgo.VERTEX, vmin[0]+i*dv[0], vmin[1]+j*dv[1], vmin[2]+k*dv[2],
+                    cgo.VERTEX, vmin[0]+(i+1)*dv[0], vmin[1]+j*dv[1], vmin[2]+k*dv[2],
+                    cgo.VERTEX, vmin[0]+i*dv[0], vmin[1]+(j+1)*dv[1], vmin[2]+k*dv[2],
+                    cgo.VERTEX, vmin[0]+(i+1)*dv[0], vmin[1]+(j+1)*dv[1], vmin[2]+k*dv[2],
+                    cgo.VERTEX, vmin[0]+i*dv[0], vmin[1]+(j+1)*dv[1], vmin[2]+(k+1)*dv[2],
+                    cgo.VERTEX, vmin[0]+(i+1)*dv[0], vmin[1]+(j+1)*dv[1], vmin[2]+(k+1)*dv[2],
+                    cgo.VERTEX, vmin[0]+i*dv[0], vmin[1]+j*dv[1], vmin[2]+(k+1)*dv[2],
+                    cgo.VERTEX, vmin[0]+(i+1)*dv[0], vmin[1]+j*dv[1], vmin[2]+(k+1)*dv[2],
+                    cgo.VERTEX, vmin[0]+i*dv[0], vmin[1]+j*dv[1], vmin[2]+k*dv[2],
+                    cgo.VERTEX, vmin[0]+i*dv[0], vmin[1]+(j+1)*dv[1], vmin[2]+k*dv[2],
+                    cgo.VERTEX, vmin[0]+(i+1)*dv[0], vmin[1]+j*dv[1], vmin[2]+k*dv[2],
+                    cgo.VERTEX, vmin[0]+(i+1)*dv[0], vmin[1]+(j+1)*dv[1], vmin[2]+k*dv[2],
+                    cgo.VERTEX, vmin[0]+i*dv[0], vmin[1]+j*dv[1], vmin[2]+(k+1)*dv[2],
+                    cgo.VERTEX, vmin[0]+i*dv[0], vmin[1]+(j+1)*dv[1], vmin[2]+(k+1)*dv[2],
+                    cgo.VERTEX, vmin[0]+(i+1)*dv[0], vmin[1]+j*dv[1], vmin[2]+(k+1)*dv[2],
+                    cgo.VERTEX, vmin[0]+(i+1)*dv[0], vmin[1]+(j+1)*dv[1], vmin[2]+(k+1)*dv[2],
+                ])
+    obj.append(cgo.END)
+
+    name = _self.get_unused_name("gridbox")
+    _self.load_cgo(obj, name, zoom=0)
+
+    return name
+
+
 # Autocomplete
 cmd.auto_arg[0].update({
     "beautify": cmd.auto_arg[0]["zoom"],
     "bounding_box": cmd.auto_arg[0]["zoom"],
+    "gridbox": cmd.auto_arg[0]["zoom"],
 })

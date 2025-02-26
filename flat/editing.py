@@ -18,51 +18,60 @@ import numpy as np
 
 
 @cmd.extend
-def align_eig(selection="all", state=0, *, _self=cmd):
+def align2eigen(selection="all", state=0, *, _self=cmd):
     """
     DESCRIPTION
-        Align selection with along it's eigen vector. 
+        Align selection with it's eigen vector. 
     USAGE
-        align_eig [ selection [, state ]]
+        align2eigen [ selection [, state ]]
     """
     xyz = _self.get_coords(selection, state)
-    cov = np.cov(xyz, rowvar=False)
+    # Center coordinates
+    mean = np.mean(xyz, axis=0)
+    centered = xyz - mean
+    # Compute eigenvectors and eigenvalues
+    cov = np.cov(centered.T)
     eval, evec = np.linalg.eig(cov)
-    xyz -= np.mean(xyz, axis=0)
-    if np.linalg.det(evec): 
-        evec = np.linalg.inv(evec)
-    xyz = np.dot(xyz, evec)
-    _self.load_coords(xyz, selection, state=state)
-    return
+    # Ensure a proper right-handed coordinate system
+    if np.linalg.det(evec) < 0:
+        evec[:, -1] *= -1
+    # Transform the points to the new basis
+    aligned = np.matmul(centered, evec) + mean
+    _self.load_coords(aligned, selection, state)
 
 
 @cmd.extend
-def align_3p(pk1="pk1", pk2="pk2", pk3="pk3", selection="all", state=0, *, _self=cmd):
+def align2points(selection="all", pk1="(pk1)", pk2="(pk2)", pk3="(pk3)", state=0, *, _self=cmd):
     """
     DESCRIPTION
-        Align selection with along three selected points. 
+        Align selection with three selected point i.e. angle formed by selections 
+        (pk1), (pk2), and (pk3) which can be set using the "PkAt" mouse action
+        (typically, Ctrl-middle-click).
     USAGE
-        align_3p pk1, pk2, pk3, [ selection [, state ]]
+        align2points [ selection [, pk1, pk2, pk3, [, state ]]]
     """
+    angle = _self.get_angle(pk1, pk2, pk3)
+    if not angle:
+        raise ValueError("Selection must be non-colinear points")
     v1 = _self.get_coords(pk1, state)
-    v2 = _self.get_coords(pk2, state) 
+    v2 = ref = _self.get_coords(pk2, state)
     v3 = _self.get_coords(pk3, state)
     # Define a new base
-    vx = v1 - v2
-    vz = np.cross(v3 - v2, vx)
+    vx = v1 - ref
+    vz = np.cross(v3 - ref, vx)
     vy = np.cross(vz, vx)
     # Normalize base
     vx /= np.linalg.norm(vx)
     vy /= np.linalg.norm(vy)
     vz /= np.linalg.norm(vz)
     # Stack to matrix
-    base = np.array([vx, vy, vz]).reshape(3, 3)
+    base = np.array([vx, vy, vz]).reshape(3, 3).T
     # Transform to new base
-    # TODO: Account for center shift
-    xyz = _self.get_coords(selection, state).T
-    xyz = np.matmul(base.T, xyz)
-    _self.load_coords(xyz.T, selection, state=state)
-    return
+    xyz = _self.get_coords(selection, state) - ref
+    xyz = np.matmul(xyz, base)
+    _self.load_coords(xyz + ref, selection, state=state)
+    # Update selection
+    _self.edit(pk1, pk2, pk3)
 
 
 @cmd.extend
@@ -160,6 +169,8 @@ def copy_identifiers(target, source, identifiers="segi chain resi",
 
 # Autocomplete
 cmd.auto_arg[0].update({
+    "align2eigen": cmd.auto_arg[0]["zoom"],
+    "align2points": cmd.auto_arg[0]["zoom"],
     "split": cmd.auto_arg[0]["zoom"],
     "remove_alt": cmd.auto_arg[0]["zoom"],
     "copy_identifiers": cmd.auto_arg[0]["zoom"]

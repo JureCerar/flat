@@ -32,8 +32,15 @@ def cube(center=(0, 0, 0), normal=(0, 0, 1), length=(1, 1, 1),
         https://wiki.pymol.org/index.php/Cubes
     """
     quiet = int(quiet)
+    if _self.is_string(center):
+        center = _self.safe_list_eval(center)
+    if _self.is_string(normal):
+        normal = _self.safe_list_eval(normal)
+    if _self.is_string(length):
+        length = _self.safe_list_eval(length)
     if color and isinstance(color, str):
-        color = list(_self.get_color_tuple(color))
+        color = _self.get_color_tuple(color)
+    
     obj = []
 
     axis = cpv.cross_product(normal, (0, 0, 1))
@@ -110,8 +117,13 @@ def sphere(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
         https://pymolwiki.org/index.php/CGO_Shapes
     """
     quiet = int(quiet)
+    if _self.is_string(center):
+        center = _self.safe_list_eval(center)
+    if _self.is_string(normal):
+        normal = _self.safe_list_eval(normal)
     if color and isinstance(color, str):
-        color = list(_self.get_color_tuple(color))
+        color = _self.get_color_tuple(color)
+
     obj = []
 
     if color:
@@ -143,10 +155,15 @@ def cylinder(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
         https://pymolwiki.org/index.php/CGO_Shapes
     """
     quiet = int(quiet)
+    if _self.is_string(center):
+        center = _self.safe_list_eval(center)
+    if _self.is_string(normal):
+        normal = _self.safe_list_eval(normal)
     if color and isinstance(color, str):
-        color = list(_self.get_color_tuple(color))
+        color = _self.get_color_tuple(color)
     else:
         color = (1, 1, 1)  #ffffff
+
     obj = []
 
     axis = cpv.cross_product(normal, (0, 0, 1))
@@ -182,8 +199,12 @@ def cone(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
         https://pymolwiki.org/index.php/CGO_Shapes
     """
     quiet = int(quiet)
+    if _self.is_string(center):
+        center = _self.safe_list_eval(center)
+    if _self.is_string(normal):
+        normal = _self.safe_list_eval(normal)
     if color and isinstance(color, str):
-        color = list(_self.get_color_tuple(color))
+        color = _self.get_color_tuple(color)
     else:
         color = (1, 1, 1)  #ffffff
     obj = []
@@ -213,8 +234,13 @@ def polygon(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
     from math import sin, cos, pi
 
     sides, quiet = int(sides), int(quiet)
+    if _self.is_string(center):
+        center = _self.safe_list_eval(center)
+    if _self.is_string(normal):
+        normal = _self.safe_list_eval(normal)
     if color and isinstance(color, str):
-        color = list(_self.get_color_tuple(color))
+        color = _self.get_color_tuple(color)
+
     obj = []
 
     axis = cpv.cross_product(normal, (0, 0, 1))
@@ -271,8 +297,13 @@ def prism(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
     from math import sin, cos, pi
 
     sides, quiet = int(sides), int(quiet)
+    if _self.is_string(center):
+        center = _self.safe_list_eval(center)
+    if _self.is_string(normal):
+        normal = _self.safe_list_eval(normal)
     if color and isinstance(color, str):
-        color = list(_self.get_color_tuple(color))
+        color = _self.get_color_tuple(color)
+
     obj = []
 
     axis = cpv.cross_product(normal, (0, 0, 1))
@@ -349,8 +380,12 @@ def torus(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
     from math import sin, cos, pi
 
     samples, quiet = int(samples), int(quiet)
+    if _self.is_string(center):
+        center = _self.safe_list_eval(center)
+    if _self.is_string(normal):
+        normal = _self.safe_list_eval(normal)
     if color and isinstance(color, str):
-        color = list(_self.get_color_tuple(color))
+        color = _self.get_color_tuple(color)
     obj = []
 
     axis = cpv.cross_product(normal, (0., 0., 1.))
