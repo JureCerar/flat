@@ -20,7 +20,7 @@ FLAT is a collection of scripts and utilities for PyMOL molecular visualizer.
 __author__ = "Jure Cerar"
 __copyright__ = "Copyright (C) 2023-2025 Jure Cerar"
 __license__ = "GNU GPL v3.0"
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 try:
     from pymol import cmd
@@ -30,6 +30,8 @@ except:
 
 __all__ = [
     "aaindex",
+    "anarci",
+    "clustalo",
     "coloring",
     "creating",
     "editing",
@@ -42,6 +44,7 @@ __all__ = [
     "minimizing",
     "modelling",
     "plotting",
+    "propka",
     "querying",
     "selecting",
     "seqalign",

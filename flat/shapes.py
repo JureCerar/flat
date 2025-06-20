@@ -14,7 +14,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from pymol import cgo, cmd
-from pymol.chempy import cpv
+from chempy import cpv
 
 
 @cmd.extend
