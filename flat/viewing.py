@@ -14,6 +14,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from pymol import cmd, cgo
+from pymol.chempy import cpv
 import numpy as np
 
 
@@ -33,12 +34,36 @@ def beautify(selection="all", mode=0, *, _self=cmd):
     _self.show("wire", f"{selection} and ! polymer.protein")
     _self.show("cartoon", f"{selection} and polymer.protein")
     _self.show(
-        ["licorice", "line"][mode],
+        ["line", "licorice", "wire"][mode],
         f"((byres ({selection})) & (sc. | (n. CA | n. N & r. PRO)))"
     )
     _self.hide(f"({selection} and hydro and (e. C extend 1))")
     _self.color("atomic", f"({selection}) and ! e. C")
     return
+
+
+@cmd.extend
+def text(expression, selection="polymer", size=26, va=0.8, ha=0.0, *, _self=cmd):
+    """
+    DESCRIPTION
+        Display text over selection.
+    USAGE
+        text expression [, selection [, size [, va [, ha ]]]]
+    ARGUMENTS
+        expression = str: Text to display
+        selection = str: Atom selection. {default: polymer}
+        size = int: Text size. {default: 26}
+        va = float: Vertical alignment (0 is center). {default: 0.0}
+        ha = float: Horizontal alignment (0 is center). {default: 0.8}
+    """
+    size, ha, va = int(size), float(ha), float(va)
+    com = _self.centerofmass(selection)
+    vmin, vmax = _self.get_extent(selection)
+    dist = cpv.distance(vmin, vmax) / 2
+    name = _self.get_unused_name("text")
+    _self.pseudoatom(name, label=expression, pos=com)
+    _self.set("label_position", (dist * ha, dist * va, 0), name)
+    _self.set("label_size", size, name)
 
 
 @cmd.extend
@@ -334,4 +359,7 @@ cmd.auto_arg[0].update({
     "beautify": cmd.auto_arg[0]["zoom"],
     "bounding_box": cmd.auto_arg[0]["zoom"],
     "gridbox": cmd.auto_arg[0]["zoom"],
+})
+cmd.auto_arg[1].update({
+    "text": cmd.auto_arg[0]["zoom"],
 })

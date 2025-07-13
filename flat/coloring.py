@@ -324,6 +324,19 @@ def cbe(selection="(all)", *, _self=cmd, **kwargs):
 
 
 @cmd.extend
+def cbi(selection="(all)", palette="rainbow2", *, _self=cmd):
+    """
+    DESCRIPTION
+        Color by residue index.
+    USAGE
+        cbi [selection]
+    """
+    for chain in _self.get_chains(selection):
+        _self.spectrum("resi", palette, f"({selection}) & c. '{chain}'")
+    return
+
+
+@cmd.extend
 def cbattr(selection="(all)", attribute=[], _self=cmd):
     """
     DESCRIPTION
@@ -488,6 +501,7 @@ cmd.auto_arg[0].update({
     "cbo": cmd.auto_arg[0]["zoom"],
     "cbc": cmd.auto_arg[0]["zoom"],
     "cbe": cmd.auto_arg[0]["zoom"],
+    "cbi": cmd.auto_arg[0]["zoom"],
     "cbattr": cmd.auto_arg[0]["zoom"],
     "cbalpha": cmd.auto_arg[0]["zoom"],
     "cbs": cmd.auto_arg[0]["zoom"],
@@ -495,6 +509,7 @@ cmd.auto_arg[0].update({
 })
 cmd.auto_arg[1].update({
     "cbattr": [cmd.Shortcut(_attributes), "arg", ""],
+    "cbi": cmd.auto_arg[1]["spectrum"],
     "cbs": cmd.auto_arg[0]["color"],
 })
 cmd.auto_arg[2].update({

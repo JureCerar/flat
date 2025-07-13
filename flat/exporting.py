@@ -244,6 +244,26 @@ def save_colored_fasta(filename, selection="(all)", invert=0, *, _self=cmd):
     return
 
 
+@cmd.extend
+def save_xyzr(filename, selection="(all)", state=1, *, _self=cmd):
+    """
+    DESCRIPTION
+        Write the given selection to an xyzr or xyzrn (determined by extension)
+        file for MSMS.
+    USAGE
+        save_xyzr filename [, selection [, state ]]]
+    """
+    if filename.endswith("xyzrn"):
+        expr = "callback(x, y, z, vdw, name, resn, resi)"
+        fmt = "%.3f %.3f %.3f %.2f 1 %s_%s_%s"
+    else:
+        expr = "callback(x, y, z, vdw)"
+        fmt = "%.3f %.3f %.3f %.2f"
+    with open(filename, "w") as f:
+        callback = lambda *args: print(fmt % args, file=f)
+        _self.iterate_state(state, selection, expr, space=locals())
+
+
 # Register extensions
 try:
     from pymol.exporting import savefunctions
@@ -252,6 +272,8 @@ try:
     savefunctions.setdefault("pir", save_pir)
     for ext in ["dcd", "xtc", "trj", "crd"]:
         savefunctions.setdefault(ext, save_mda)
+    for ext in ["xyzr", "xyzrn",]:
+        savefunctions.setdefault(ext, save_xyzr)
 except ImportError:
     pass
 
@@ -262,4 +284,5 @@ cmd.auto_arg[1].update({
     "save_pir": cmd.auto_arg[1]["save"],
     "save_mda": cmd.auto_arg[1]["save"],
     "save_colored_fasta": cmd.auto_arg[1]["save"],
+    "save_xyzr": cmd.auto_arg[1]["save"],
 })
