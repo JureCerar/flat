@@ -14,19 +14,22 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from pymol import cgo, cmd
-from chempy import cpv
+from pymol.chempy import cpv
 
 
 @cmd.extend
-def cube(center=(0, 0, 0), normal=(0, 0, 1), length=(1, 1, 1),
-         color="", *, quiet=0, _self=cmd):
+def cube(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, length=(1, 1, 1),
+         color="", *, quiet=1, _self=cmd):
     """
     DESCRIPTION
-        Return a CGO rectangular cuboid object. 
+        Return a CGO rectangular cuboid object.
+    USAGE 
+        cube [ center [, normal [, rotation, [, length [, color ]]]]]
     ARGUMENTS
-        center = float3: shape position  {default: 0, 0, 0}
-        normal = float3: orientation of shape  {default: 1, 0, 0}
-        lenght = float3: dimensions {default: 1, 1, 1}
+        center = float3: shape position {default: 0, 0, 0}
+        normal = float3: orientation of shape {default: 1, 0, 0}
+        rotation = float: rotation around normal in rad {default: 0}
+        length = float3: dimensions {default: 1, 1, 1}
         color = string: color name {default: None}
     REFERENCE
         https://wiki.pymol.org/index.php/Cubes
@@ -46,16 +49,15 @@ def cube(center=(0, 0, 0), normal=(0, 0, 1), length=(1, 1, 1),
     axis = cpv.cross_product(normal, (0, 0, 1))
     angle = -cpv.get_angle(normal, (0, 0, 1))
     matrix = cpv.rotation_matrix(angle, cpv.normalize(axis))
+    rotmat = cpv.rotation_matrix(rotation, cpv.normalize(normal))
 
     def add_normal(xyz):
-        return obj.extend(
-            [cgo.NORMAL] + cpv.transform(matrix, xyz)
-        )
+        _xyz = cpv.transform(rotmat, cpv.transform(matrix, xyz))
+        return obj.extend([cgo.NORMAL] + _xyz)
 
     def add_vertex(xyz):
-        return obj.extend(
-            [cgo.VERTEX] + cpv.add(center, cpv.transform(matrix, xyz))
-        )
+        _xyz = cpv.transform(rotmat, cpv.transform(matrix, xyz))
+        return obj.extend([cgo.VERTEX] + cpv.add(center, _xyz))
 
     x, y, z = length
     for s in [-1, 1]:
@@ -102,7 +104,7 @@ def cube(center=(0, 0, 0), normal=(0, 0, 1), length=(1, 1, 1),
 
 @cmd.extend
 def sphere(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
-           color="", *, quiet=0, _self=cmd):
+           color="", *, quiet=1, _self=cmd):
     """
     DESCRIPTION
         Return a CGO sphere object.
@@ -139,7 +141,7 @@ def sphere(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
 
 @cmd.extend
 def cylinder(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
-             height=1, color="", *, quiet=0, _self=cmd):
+             height=1, color="", *, quiet=1, _self=cmd):
     """
     DESCRIPTION
         Return a CGO cylinder object.
@@ -183,7 +185,7 @@ def cylinder(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
 
 @cmd.extend
 def cone(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
-         height=1, color="", *, quiet=0, _self=cmd):
+         height=1, color="", *, quiet=1, _self=cmd):
     """
     DESCRIPTION
         Return a CGO cone object.
@@ -225,8 +227,8 @@ def cone(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
 
 
 @cmd.extend
-def polygon(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
-            sides=3, color="", *, quiet=0, _self=cmd):
+def polygon(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, radius=0.5,
+            sides=3, color="", *, quiet=1, _self=cmd):
     """
     DESCRIPTION
         Return a CGO n-sided polygon object.
@@ -246,16 +248,15 @@ def polygon(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
     axis = cpv.cross_product(normal, (0, 0, 1))
     angle = -cpv.get_angle(normal, (0, 0, 1))
     matrix = cpv.rotation_matrix(angle, cpv.normalize(axis))
+    rotmat = cpv.rotation_matrix(rotation, cpv.normalize(normal))
 
     def add_normal(xyz):
-        return obj.extend(
-            [cgo.NORMAL] + cpv.transform(matrix, xyz)
-        )
+        _xyz = cpv.transform(rotmat, cpv.transform(matrix, xyz))
+        return obj.extend([cgo.NORMAL] + _xyz)
 
     def add_vertex(xyz):
-        return obj.extend(
-            [cgo.VERTEX] + cpv.add(center, cpv.transform(matrix, xyz))
-        )
+        _xyz = cpv.transform(rotmat, cpv.transform(matrix, xyz))
+        return obj.extend([cgo.VERTEX] + cpv.add(center, _xyz))
 
     obj.append(cgo.BEGIN)
     obj.append(cgo.TRIANGLE_FAN)
@@ -277,16 +278,17 @@ def polygon(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
 
 
 @cmd.extend
-def prism(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
-          height=1, sides=3, color="",  *, quiet=0, _self=cmd):
+def prism(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, radius=0.5,
+          height=1, sides=3, color="",  *, quiet=1, _self=cmd):
     """
     DESCRIPTION
         Return a CGO n-sided prism object.
     USAGE 
-        sphere [ center [, normal [, radius [, height [, sides  [, color ]]]]]]
+        sphere [ center [, normal [, rotation [, radius [, height [, sides  [, color ]]]]]]]
     ARGUMENTS
         center = float3: object position  {default: 0, 0, 0}
         normal = float3: orientation of object  {default: 0, 0, 1}
+        rotation = float: rotation around normal in rad {default: 0}
         radius = float: object's radius {default: 1}
         height = float: object's height {default: 1}
         sides = int: num of polygon sides {default: 3}
@@ -309,16 +311,15 @@ def prism(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
     axis = cpv.cross_product(normal, (0, 0, 1))
     angle = -cpv.get_angle(normal, (0, 0, 1))
     matrix = cpv.rotation_matrix(angle, cpv.normalize(axis))
+    rotmat = cpv.rotation_matrix(rotation, cpv.normalize(normal))
 
     def add_normal(xyz):
-        return obj.extend(
-            [cgo.NORMAL] + cpv.transform(matrix, xyz)
-        )
+        _xyz = cpv.transform(rotmat, cpv.transform(matrix, xyz))
+        return obj.extend([cgo.NORMAL] + _xyz)
 
     def add_vertex(xyz):
-        return obj.extend(
-            [cgo.VERTEX] + cpv.add(center, cpv.transform(matrix, xyz))
-        )
+        _xyz = cpv.transform(rotmat, cpv.transform(matrix, xyz))
+        return obj.extend([cgo.VERTEX] + cpv.add(center, _xyz))
 
     # Top
     obj.append(cgo.BEGIN)
@@ -369,8 +370,90 @@ def prism(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
 
 
 @cmd.extend
+def pyramid(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, radius=0.5,
+            height=1, sides=3, color="",  *, quiet=1, _self=cmd):
+    """
+    DESCRIPTION
+        Return a CGO n-sided pyramid object.
+    USAGE 
+        pyramid [ center [, normal [, rotation, [, radius [, height [, sides  [, color ]]]]]]]
+    ARGUMENTS
+        center = float3: object position  {default: 0, 0, 0}
+        normal = float3: orientation of object  {default: 0, 0, 1}
+        rotation = float: rotation around normal in rad {default: 0}
+        radius = float: object's radius {default: 1}
+        height = float: object's height {default: 1}
+        sides = int: num of pyramid sides {default: 3}
+        color = string: object color {default: None}
+    REFERENCE
+        https://pymolwiki.org/index.php/CGO_Shapes
+    """
+    from math import sin, cos, pi
+
+    sides, quiet = int(sides), int(quiet)
+    if _self.is_string(center):
+        center = _self.safe_list_eval(center)
+    if _self.is_string(normal):
+        normal = _self.safe_list_eval(normal)
+    if color and isinstance(color, str):
+        color = _self.get_color_tuple(color)
+
+    obj = []
+
+    axis = cpv.cross_product(normal, (0, 0, 1))
+    angle = -cpv.get_angle(normal, (0, 0, 1))
+    matrix = cpv.rotation_matrix(angle, cpv.normalize(axis))
+    rotmat = cpv.rotation_matrix(rotation, cpv.normalize(normal))
+
+    def add_normal(xyz):
+        _xyz = cpv.transform(rotmat, cpv.transform(matrix, xyz))
+        return obj.extend([cgo.NORMAL] + _xyz)
+
+    def add_vertex(xyz):
+        _xyz = cpv.transform(rotmat, cpv.transform(matrix, xyz))
+        return obj.extend([cgo.VERTEX] + cpv.add(center, _xyz))
+
+    # Bottom
+    obj.append(cgo.BEGIN)
+    obj.append(cgo.TRIANGLE_FAN)
+    if color:
+        obj.extend([cgo.COLOR, *color])
+    add_normal((0, 0, 1))
+    add_vertex((0, 0, -height * 0.5))
+    for i in range(sides + 1):
+        angle = 2 * pi * i / sides
+        x1, y1 = cos(angle) * radius, sin(angle) * radius
+        add_vertex((x1, y1, -height * 0.5))
+    obj.append(cgo.END)
+
+    # Sides
+    for i in range(sides + 1):
+        obj.append(cgo.BEGIN)
+        obj.append(cgo.TRIANGLES)
+        if color:
+            obj.extend([cgo.COLOR, *color])
+        angle1 = 2 * pi * i / sides
+        x1, y1 = cos(angle1) * radius, sin(angle1) * radius
+        angle2 = 2 * pi * (i + 1) / sides
+        x2, y2 = cos(angle2) * radius, sin(angle2) * radius
+        v1 = cpv.sub((x1, y1, -height * 0.5), (0, 0,  height * 0.5))
+        v2 = cpv.sub((x2, y2, -height * 0.5), (0, 0,  height * 0.5))
+        add_normal(cpv.cross_product(v1, v2))
+        add_vertex((x1, y1, -height * 0.5))
+        add_vertex((x2, y2, -height * 0.5))
+        add_vertex((0, 0,  height * 0.5))
+        obj.append(cgo.END)
+
+    if not quiet:
+        name = _self.get_unused_name("shape")
+        _self.load_cgo(obj, name, zoom=0)
+
+    return obj
+
+
+@cmd.extend
 def torus(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5, 
-          cradius=.25, color="", samples=20, *, quiet=0, _self=cmd):
+          cradius=.25, color="", samples=20, *, quiet=1, _self=cmd):
     """
     DESCRIPTION
         Return a CGO torus object.
