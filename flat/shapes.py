@@ -59,41 +59,79 @@ def cube(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, length=(1, 1, 1),
         _xyz = cpv.transform(rotmat, cpv.transform(matrix, xyz))
         return obj.extend([cgo.VERTEX] + cpv.add(center, _xyz))
 
-    x, y, z = length
-    for s in [-1, 1]:
-        # X-axis
-        obj.append(cgo.BEGIN)
-        obj.append(cgo.TRIANGLE_STRIP)
-        if color:
-            obj.extend([cgo.COLOR, *color])
-        add_normal((1, 0, 0))
-        add_vertex(cpv.scale((x,  y,  z), 0.5 * s))
-        add_vertex(cpv.scale((x, -y,  z), 0.5 * s))
-        add_vertex(cpv.scale((x,  y, -z), 0.5 * s))
-        add_vertex(cpv.scale((x, -y, -z), 0.5 * s))
-        obj.append(cgo.END)
-        # Y-axis
-        obj.append(cgo.BEGIN)
-        obj.append(cgo.TRIANGLE_STRIP)
-        if color:
-            obj.extend([cgo.COLOR, *color])
-        add_normal((0, 1, 0))
-        add_vertex(cpv.scale((x, y, -z), 0.5 * s))
-        add_vertex(cpv.scale((-x, y, -z), 0.5 * s))
-        add_vertex(cpv.scale((x, y,  z), 0.5 * s))
-        add_vertex(cpv.scale((-x, y,  z), 0.5 * s))
-        obj.append(cgo.END)
-        # Z-axis
-        obj.append(cgo.BEGIN)
-        obj.append(cgo.TRIANGLE_STRIP)
-        if color:
-            obj.extend([cgo.COLOR, *color])
-        add_normal((0, 0, 1))
-        add_vertex(cpv.scale((-x,  y, z), 0.5 * s))
-        add_vertex(cpv.scale((-x, -y, z), 0.5 * s))
-        add_vertex(cpv.scale((x,  y, z), 0.5 * s))
-        add_vertex(cpv.scale((x, -y, z), 0.5 * s))
-        obj.append(cgo.END)
+    x, y, z = cpv.scale(length, 0.5)
+
+    # Right
+    obj.append(cgo.BEGIN)
+    obj.append(cgo.TRIANGLE_STRIP)
+    if color:
+        obj.extend([cgo.COLOR, *color])
+    add_normal((1, 0, 0))
+    add_vertex(( x, -y,  z))
+    add_vertex(( x, -y, -z))
+    add_vertex(( x,  y,  z))
+    add_vertex(( x,  y, -z))
+    obj.append(cgo.END)
+
+    # Left
+    obj.append(cgo.BEGIN)
+    obj.append(cgo.TRIANGLE_STRIP)
+    if color:
+        obj.extend([cgo.COLOR, *color])
+    add_normal((-1, 0, 0))
+    add_vertex((-x, -y,  z))
+    add_vertex((-x,  y,  z))
+    add_vertex((-x, -y, -z))
+    add_vertex((-x,  y, -z))
+    obj.append(cgo.END)
+
+    # Top
+    obj.append(cgo.BEGIN)
+    obj.append(cgo.TRIANGLE_STRIP)
+    if color:
+        obj.extend([cgo.COLOR, *color])
+    add_normal((0, 1, 0))
+    add_vertex((-x,  y,  z))
+    add_vertex(( x,  y,  z))
+    add_vertex((-x,  y, -z))
+    add_vertex(( x,  y, -z))
+    obj.append(cgo.END)
+
+    # Bottom
+    obj.append(cgo.BEGIN)
+    obj.append(cgo.TRIANGLE_STRIP)
+    if color:
+        obj.extend([cgo.COLOR, *color])
+    add_normal((0, -1, 0))
+    add_vertex((-x, -y,  z))
+    add_vertex((-x, -y, -z))
+    add_vertex(( x, -y,  z))
+    add_vertex(( x, -y, -z))
+    obj.append(cgo.END)
+
+    # Front
+    obj.append(cgo.BEGIN)
+    obj.append(cgo.TRIANGLE_STRIP)
+    if color:
+        obj.extend([cgo.COLOR, *color])
+    add_normal((0, 0, 1))
+    add_vertex((-x, -y,  z))
+    add_vertex(( x, -y,  z))
+    add_vertex((-x,  y,  z))
+    add_vertex(( x,  y,  z))
+    obj.append(cgo.END)
+
+    # Back
+    obj.append(cgo.BEGIN)
+    obj.append(cgo.TRIANGLE_STRIP)
+    if color:
+        obj.extend([cgo.COLOR, *color])
+    add_normal((0, 0, -1))
+    add_vertex((-x, -y, -z))
+    add_vertex((-x,  y, -z))
+    add_vertex(( x, -y, -z))
+    add_vertex(( x,  y, -z))
+    obj.append(cgo.END)
 
     if not quiet:
         name = _self.get_unused_name("shape")
@@ -113,7 +151,7 @@ def sphere(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
     ARGUMENTS
         center = float3: object position  {default: 0, 0, 0}
         normal = float3: orientation of object  {default: 0, 0, 1}
-        length = float: object's radius {default: 1}
+        radius = float: object's radius {default: 1}
         color = string: object color {default: None}
     REFERENCE
         https://pymolwiki.org/index.php/CGO_Shapes
@@ -141,7 +179,7 @@ def sphere(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
 
 @cmd.extend
 def cylinder(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
-             height=1, color="", *, quiet=1, _self=cmd):
+             height=1.0, color="", *, quiet=1, _self=cmd):
     """
     DESCRIPTION
         Return a CGO cylinder object.
@@ -185,7 +223,7 @@ def cylinder(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
 
 @cmd.extend
 def cone(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
-         height=1, color="", *, quiet=1, _self=cmd):
+         height=1.0, color="", *, quiet=1, _self=cmd):
     """
     DESCRIPTION
         Return a CGO cone object.
@@ -333,18 +371,20 @@ def prism(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, radius=0.5,
         x1, y1 = cos(angle) * radius, sin(angle) * radius
         add_vertex((x1, y1, height * 0.5))
     obj.append(cgo.END)
+
     # Bottom
     obj.append(cgo.BEGIN)
     obj.append(cgo.TRIANGLE_FAN)
     if color:
         obj.extend([cgo.COLOR, *color])
-    add_normal((0, 0, 1))
+    add_normal((0, 0, -1))
     add_vertex((0, 0, -height * 0.5))
-    for i in range(sides + 1):
+    for i in range(sides + 1)[::-1]:
         angle = 2 * pi * i / sides
         x1, y1 = cos(angle) * radius, sin(angle) * radius
         add_vertex((x1, y1, -height * 0.5))
     obj.append(cgo.END)
+
     # Sides
     for i in range(sides + 1):
         obj.append(cgo.BEGIN)
@@ -371,7 +411,7 @@ def prism(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, radius=0.5,
 
 @cmd.extend
 def pyramid(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, radius=0.5,
-            height=1, sides=3, color="",  *, quiet=1, _self=cmd):
+            height=1.0, sides=3, color="",  *, quiet=1, _self=cmd):
     """
     DESCRIPTION
         Return a CGO n-sided pyramid object.
@@ -418,9 +458,9 @@ def pyramid(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, radius=0.5,
     obj.append(cgo.TRIANGLE_FAN)
     if color:
         obj.extend([cgo.COLOR, *color])
-    add_normal((0, 0, 1))
+    add_normal((0, 0, -1))
     add_vertex((0, 0, -height * 0.5))
-    for i in range(sides + 1):
+    for i in range(sides + 1)[::-1]:
         angle = 2 * pi * i / sides
         x1, y1 = cos(angle) * radius, sin(angle) * radius
         add_vertex((x1, y1, -height * 0.5))
@@ -534,6 +574,92 @@ def torus(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
             v += dv
         obj.append(cgo.END)
         w += dw
+
+    if not quiet:
+        name = _self.get_unused_name("shape")
+        _self.load_cgo(obj, name, zoom=0)
+
+    return obj
+
+
+@cmd.extend
+def octahedron(center=(0, 0, 0), normal=(0, 0, 1), rotation=0,
+               length=1.0, color="", *, quiet=1, _self=cmd):
+    """
+    DESCRIPTION
+        Return a CGO octahedron object.
+    USAGE 
+        octahedron [ center [, normal [, rotation, [, length [, color ]]]]]
+    ARGUMENTS
+        center = float3: object position  {default: 0, 0, 0}
+        normal = float3: object orientation {default: 0, 0, 1}
+        rotation = float: rotation around normal [rad] {default: 0}
+        length = float: object side length {default: 1}
+        color = string: object color {default: None}
+    """
+    from math import sqrt
+    quiet = int(quiet)
+    if _self.is_string(center):
+        center = _self.safe_list_eval(center)
+    if _self.is_string(normal):
+        normal = _self.safe_list_eval(normal)
+    if _self.is_string(length):
+        length = _self.safe_list_eval(length)
+    if color and isinstance(color, str):
+        color = _self.get_color_tuple(color)
+
+    obj = []
+
+    axis = cpv.cross_product(normal, (0, 0, 1))
+    angle = -cpv.get_angle(normal, (0, 0, 1))
+    matrix = cpv.rotation_matrix(angle, cpv.normalize(axis))
+    rotmat = cpv.rotation_matrix(rotation, cpv.normalize(normal))
+
+    def add_normal(xyz):
+        _xyz = cpv.transform(rotmat, cpv.transform(matrix, xyz))
+        return obj.extend([cgo.NORMAL] + _xyz)
+
+    def add_vertex(xyz):
+        _xyz = cpv.transform(rotmat, cpv.transform(matrix, xyz))
+        return obj.extend([cgo.VERTEX] + cpv.add(center, _xyz))
+
+    x, y, z = cpv.scale((0.5, 0.5, 1./sqrt(2.)), length)
+
+    # Define vertices
+    vertices = [
+        [ x,  y,  0],  # 0
+        [-x, -y,  0],  # 1
+        [-x,  y,  0],  # 2
+        [ x, -y,  0],  # 3
+        [ 0,  0,  z],  # 4 (top)
+        [ 0,  0, -z],  # 5 (bottom)
+    ]
+
+    # Define triangular faces
+    faces = [
+        [0, 2, 4],
+        [2, 1, 4],
+        [1, 3, 4],
+        [3, 0, 4],
+        [0, 5, 2],
+        [2, 5, 1],
+        [1, 5, 3],
+        [3, 5, 0],
+    ]
+
+    for face in faces:
+        v0, v1, v2 = [vertices[i] for i in face]
+        r1 = cpv.sub(v1, v0)
+        r2 = cpv.sub(v2, v0)
+        obj.append(cgo.BEGIN)
+        obj.append(cgo.TRIANGLES)
+        if color:
+            obj.extend([cgo.COLOR, *color])
+        add_normal(cpv.cross_product(r1, r2))
+        add_vertex(v0)
+        add_vertex(v1)
+        add_vertex(v2)
+        obj.append(cgo.END)
 
     if not quiet:
         name = _self.get_unused_name("shape")
