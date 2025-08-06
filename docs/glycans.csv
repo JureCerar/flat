@@ -1,0 +1,27 @@
+Monosaccharide          , Abbreviation, One-letter, PDB-alpha, PDB-beta
+D-Arabinose             , Ara         , A         , ARA      , AHR
+D-Lyxose                , Lyx         , D         , LDY      , 
+D-Ribose                , Rib         , R         , RIB      , RIP
+D-Xylose                , Xyl         , X         , XYS      , XYP
+D-Allose                , All         , N         ,          , 
+D-Altrose               , Alt         , E         ,          , 
+D-Galactose             , Gal         , L         , GLA      , GAL
+D-Glucose               , Glc         , G         , GLC      , BGC
+D-Gulose                , Gul         , K         ,          , 
+D-Idose                 , Ido         , I         ,          , 
+D-Mannose               , Man         , M         , MAN      , BMA
+D-Talose                , Tal         , T         ,          , 
+D-Fructose              , Fru         , C         , FRU      , 
+D-Psicose               , Psi         , P         ,          , 
+D-Sorbose               , Sor         , B         ,          , 
+D-Tagatose              , Tag         , J         ,          , 
+D-Fucose                , Fuc         , F         , FUC      , FUL
+D-Quinovose             , Qui         , Q         ,          , 
+D-Rhamnose              , Rha         , H         ,          , 
+D-Galacturonic Acid     , GalA        , O         , GTR      , ADA
+D-Glucuronic Acid       , GlcA        , Z         , GCU      , BDP
+D-Iduronic Acid         , IdoA        , U         , IDR      , 
+D-N-Acetylgalactosamine , GalNAc      , V         , A2G      , NGA
+D-N-Acetylglucosamine   , GlcNAc      , Y         , NDG      , NAG
+D-N-Acetylmannosamine   , ManNAc      , W         , BM3      , 
+N-Acetyl-neuraminic Acid, NeuNAc      , S         , SIA      , SLB

@@ -17,68 +17,89 @@ from pymol import cmd, cgo
 from .shapes import *
 import numpy as np
 
-# TODO:
-# - Converter from PDB names to GLYCAM (and vice versa)
-
-_GLYCAN_COLORS = {
-    "BOND": "gray",  # bond color
-    "NAG": "flat.blue",
-    "MAN": "flat.green",
-    "BMA": "flat.green",
-    "GAL": "flat.yellow",
-    "FUC": "flat.red",
-    "SIA": "flat.purple",
+# See: https://doi.org/10.1107/S2059798316016910
+glycan_one_letter = {
+    "ARA": "A", "AHR": "A", "LDY": "D", "RIB": "R", "RIP": "R", "XYS": "X",
+    "XYP": "X", "GLA": "L", "GAL": "L", "GLC": "G", "BGC": "G", "MAN": "M",
+    "BMA": "M", "FRU": "C", "FUC": "F", "FUL": "F", "GTR": "O", "ADA": "O",
+    "GCU": "Z", "BDP": "Z", "IDR": "U", "A2G": "V", "NGA": "V", "NDG": "Y",
+    "NAG": "Y", "BM3": "W", "SIA": "S", "SLB": "S",
 }
-"""Color definitions for glycans"""
 
-_GLYCAN_SHAPES = {
-    "NAG": "cube",
-    "MAN": "sphere",
-    "BMA": "sphere",
-    "GAL": "sphere",
-    "FUC": "cone",
-    "SIA": "octahedron",
+glycan_colors = {
+    "Y": "flat.green",  # Man
+    "M": "flat.blue",  # GlcNAc
+    "V": "flat.yellow",  # GalNAc
+    "L": "flat.yellow",  # Gal
+    "F": "flat.red",  # Fuc
+    "S": "flat.purple",  # Sia
 }
-"""Shape definitions for glycans"""
+
+glycan_shapes = {
+    "Y": "sphere",  # Man
+    "M": "cube",  # GlcNAc
+    "V": "cube",  # GalNAc
+    "L": "sphere",  # Gal
+    "F": "cone",  # Fuc
+    "S": "octahedron",  # Sia
+}
 
 
-def _get_ring(selection):
-    """Determine which atoms define the sugar rings"""
+def _get_glycan(key: str):
+    """Try to get one-letter code for glycan key"""
+    key = key.strip()
+
+    if len(key) == 1:
+        return key
+    
+    elif len(key) == 3:
+        if key in glycan_one_letter:
+            return glycan_one_letter[key]
+        # Check if GLYCAM notation
+        if key[0] in list("012346ZYXWVUTSRQP"):
+            if key[2] in list("AB"):
+                return key[1]
+                
+    return None
+
+
+def _get_ring(selection: str, _self=cmd):
+    """Determine which atoms define the glycan rings"""
     ring = []
     # identify the oxygens that belong to the ring
-    cmd.iterate(
+    _self.iterate(
         f"{selection} and n. C1 extend 1 and ({selection} and n. O* and ! n. O1*)",
         "ring.append(name)",
         space=locals()
     )
     if not ring:
         # NOTE: Can fail if ring does not start with C1 e.g. SIA
-        cmd.iterate(
+        _self.iterate(
             f"{selection} and n. C2 extend 1 and ({selection} and n. O* and ! n. O1*)",
             "ring.append(name)",
             space=locals()
         )
-    tmp = cmd.get_unused_name("tmp")
+    tmp = _self.get_unused_name("tmp")
     try:
         for carbon in range(1, 10):
-            num = cmd.select(
+            num = _self.select(
                 tmp, f"not hydrogen and (neighbor ({selection} and n. C{carbon}))")
             if num > 2:
                 ring.append(f"C{carbon}")
         while True:
-            num = cmd.select(
+            num = _self.select(
                 tmp, f"{selection} and n. {ring[0]} extend 1 and n. {ring[-1]}")
             if num == 0:
                 ring.pop()
             else:
                 break
     finally:
-        cmd.delete(tmp)
+        _self.delete(tmp)
     return ring
 
 
 @cmd.extend
-def snfg(selection="all", state=0, size=2.0, name=None, *, _self=cmd):
+def snfg(selection="all", state=0, size=2.0,  name=None,  *, shapes=None, colors=None, _self=cmd):
     """
     DESCRIPTION
         Show Standard Notation For Glycans (SNFG)
@@ -92,13 +113,21 @@ def snfg(selection="all", state=0, size=2.0, name=None, *, _self=cmd):
     REFERENCE
         https://www.ncbi.nlm.nih.gov/glycans/snfg.html
     SEE ALSO
-        _GLYCAN_COLORS, _GLYCAN_SHAPES
+        cube, cone, sphere, octahedron
     """
     state, size = int(state), float(size)
 
+    # Extend shape and color dictionary
+    _glycan_shapes = glycan_shapes
+    if shapes:
+        _glycan_shapes.update(shapes)
+    _glycan_colors = glycan_colors
+    if colors:
+        _glycan_colors.update(colors)
+
     # Get residue list
     residues = []
-    cmd.iterate(
+    _self.iterate(
         f"{selection} & name C1",
         "residues.append((model, segi, chain, resn, resi))",
         space=locals()
@@ -108,7 +137,7 @@ def snfg(selection="all", state=0, size=2.0, name=None, *, _self=cmd):
     bonds = list()
     for res in residues:
         neighbors = []
-        cmd.iterate(
+        _self.iterate(
             "neighbor /{}/{}/{}/{}`{}".format(*res),
             "neighbors.append((model, segi, chain, resn, resi))",
             space=locals(),
@@ -120,9 +149,9 @@ def snfg(selection="all", state=0, size=2.0, name=None, *, _self=cmd):
     # Calculate centers of each residue
     means, normals = dict(), dict()
     for res in residues:
-        ring = _get_ring("/{}/{}/{}/{}`{}".format(*res))
+        ring = _get_ring("/{}/{}/{}/{}`{}".format(*res), _self)
         names = "+".join(ring)
-        coord = cmd.get_coords(
+        coord = _self.get_coords(
             "/{}/{}/{}/{}`{} & name {}".format(*res, names),
             state=state,
         )
@@ -140,8 +169,7 @@ def snfg(selection="all", state=0, size=2.0, name=None, *, _self=cmd):
     obj = []
 
     # Draw bonds
-    color = _GLYCAN_COLORS.get("BOND", "gray")
-    color = cmd.get_color_tuple(color)
+    color = (0.5, 0.5, 0.5)  # gray
     for a1, a2 in set(bonds):
         # Ignore amino acid residues
         if any(_ not in residues for _ in (a1, a2)):
@@ -158,9 +186,9 @@ def snfg(selection="all", state=0, size=2.0, name=None, *, _self=cmd):
         try:
             mean = means[res]
             norm = normals[res]
-            resn = res[3]
-            shape = _GLYCAN_SHAPES.get(resn, None)
-            color = _GLYCAN_COLORS.get(resn, "white")
+            key = _get_glycan(res[3])
+            shape = _glycan_shapes.get(key, None)
+            color = _glycan_colors.get(key, "white")
             # NOTE: 1.73 scale factor is there for all shapes to appear same size
             if shape == "cube":
                 length = 1.73 * np.array([size, size, size])
@@ -176,8 +204,8 @@ def snfg(selection="all", state=0, size=2.0, name=None, *, _self=cmd):
             print(f"Error: Unknown residue: {e}")
 
     if not name:
-        name = cmd.get_unused_name("SNFG")
-    cmd.load_cgo(obj, name, state=state, zoom=0)
+        name = _self.get_unused_name("SNFG")
+    _self.load_cgo(obj, name, state=state, zoom=0)
 
 
 # Autocomplete
