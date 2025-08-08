@@ -113,7 +113,7 @@ def snfg(selection="all", state=0, size=2.0,  name=None,  *, shapes=None, colors
     REFERENCE
         https://www.ncbi.nlm.nih.gov/glycans/snfg.html
     SEE ALSO
-        cube, cone, sphere, octahedron
+        cube, cone, sphere, star, octahedron
     """
     state, size = int(state), float(size)
 
@@ -197,6 +197,8 @@ def snfg(selection="all", state=0, size=2.0,  name=None,  *, shapes=None, colors
                 o = cone(mean, norm, size, 1.73 * size, color)
             elif shape == "octahedron":
                 o = octahedron(mean, norm, 0, 1.73 * size, color)
+            elif shape == "star":
+                o = star(mean, norm, 0, 5, (size, 0.5 * size), 1.73 * size, color)
             else:
                 o = sphere(mean, norm, size, color)
             obj.extend(o)

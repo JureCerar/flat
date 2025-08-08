@@ -34,7 +34,7 @@ def cube(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, length=(1, 1, 1),
     REFERENCE
         https://wiki.pymol.org/index.php/Cubes
     """
-    quiet = int(quiet)
+    rotation, quiet = float(rotation), int(quiet)
     if _self.is_string(center):
         center = _self.safe_list_eval(center)
     if _self.is_string(normal):
@@ -156,7 +156,7 @@ def sphere(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
     REFERENCE
         https://pymolwiki.org/index.php/CGO_Shapes
     """
-    quiet = int(quiet)
+    radius, quiet = float(radius), int(quiet)
     if _self.is_string(center):
         center = _self.safe_list_eval(center)
     if _self.is_string(normal):
@@ -195,6 +195,7 @@ def cylinder(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
         https://pymolwiki.org/index.php/CGO_Shapes
     """
     quiet = int(quiet)
+    radius, height = float(radius), float(height)
     if _self.is_string(center):
         center = _self.safe_list_eval(center)
     if _self.is_string(normal):
@@ -239,6 +240,7 @@ def cone(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
         https://pymolwiki.org/index.php/CGO_Shapes
     """
     quiet = int(quiet)
+    radius, height = float(radius), float(height)
     if _self.is_string(center):
         center = _self.safe_list_eval(center)
     if _self.is_string(normal):
@@ -246,7 +248,8 @@ def cone(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
     if color and isinstance(color, str):
         color = _self.get_color_tuple(color)
     else:
-        color = (1, 1, 1)  #ffffff
+        color = (1, 1, 1)  # white
+
     obj = []
 
     axis = cpv.cross_product(normal, (0, 0, 1))
@@ -274,6 +277,7 @@ def polygon(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, radius=0.5,
     from math import sin, cos, pi
 
     sides, quiet = int(sides), int(quiet)
+    rotation, radius = float(rotation), float(radius)
     if _self.is_string(center):
         center = _self.safe_list_eval(center)
     if _self.is_string(normal):
@@ -337,6 +341,7 @@ def prism(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, radius=0.5,
     from math import sin, cos, pi
 
     sides, quiet = int(sides), int(quiet)
+    rotation, radius = float(rotation), float(radius)
     if _self.is_string(center):
         center = _self.safe_list_eval(center)
     if _self.is_string(normal):
@@ -431,6 +436,7 @@ def pyramid(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, radius=0.5,
     from math import sin, cos, pi
 
     sides, quiet = int(sides), int(quiet)
+    rotation, radius, height = float(rotation), float(radius), float(height)
     if _self.is_string(center):
         center = _self.safe_list_eval(center)
     if _self.is_string(normal):
@@ -503,6 +509,7 @@ def torus(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
     from math import sin, cos, pi
 
     samples, quiet = int(samples), int(quiet)
+    radius, cradius = float(radius), float(cradius)
     if _self.is_string(center):
         center = _self.safe_list_eval(center)
     if _self.is_string(normal):
@@ -598,7 +605,8 @@ def octahedron(center=(0, 0, 0), normal=(0, 0, 1), rotation=0,
         color = string: object color {default: None}
     """
     from math import sqrt
-    quiet = int(quiet)
+
+    length, quiet = float(length), int(quiet)
     if _self.is_string(center):
         center = _self.safe_list_eval(center)
     if _self.is_string(normal):
@@ -659,6 +667,130 @@ def octahedron(center=(0, 0, 0), normal=(0, 0, 1), rotation=0,
         add_vertex(v0)
         add_vertex(v1)
         add_vertex(v2)
+        obj.append(cgo.END)
+
+    if not quiet:
+        name = _self.get_unused_name("shape")
+        _self.load_cgo(obj, name, zoom=0)
+
+    return obj
+
+
+@cmd.extend
+def star(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, sides=5,
+          radius=(1.0, 0.5), height=1, color="", *, quiet=1, _self=cmd):
+    """
+    DESCRIPTION
+        Return a CGO star prism object.
+    USAGE 
+        star [ center [, normal [, rotation, [, sides [, radius, [ height [, color ]]]]]]]
+    ARGUMENTS
+        center = float3: object position  {default: 0, 0, 0}
+        normal = float3: object orientation {default: 0, 0, 1}
+        rotation = float: rotation around normal [rad] {default: 0}
+        sides = int: number of star points {default: 5}
+        radius = float2: inner and outer star radius {default: 1.0, 0.5}
+        height = float: object height {default: 1}
+    """
+    from math import cos, sin, pi
+
+    sides, quiet = int(sides), int(quiet)
+    rotation, height = float(rotation), float(height)
+    if _self.is_string(center):
+        center = _self.safe_list_eval(center)
+    if _self.is_string(normal):
+        normal = _self.safe_list_eval(normal)
+    if _self.is_string(radius):
+        radius = _self.safe_list_eval(radius)
+    if color and isinstance(color, str):
+        color = _self.get_color_tuple(color)
+
+    obj = []
+
+    axis = cpv.cross_product(normal, (0, 0, 1))
+    angle = -cpv.get_angle(normal, (0, 0, 1))
+    matrix = cpv.rotation_matrix(angle, cpv.normalize(axis))
+    rotmat = cpv.rotation_matrix(rotation, cpv.normalize(normal))
+
+    def add_normal(xyz):
+        _xyz = cpv.transform(rotmat, cpv.transform(matrix, xyz))
+        return obj.extend([cgo.NORMAL] + _xyz)
+
+    def add_vertex(xyz):
+        _xyz = cpv.transform(rotmat, cpv.transform(matrix, xyz))
+        return obj.extend([cgo.VERTEX] + cpv.add(center, _xyz))
+
+    outer_radius, inner_radius = radius
+
+    # Top
+    obj.append(cgo.BEGIN)
+    obj.append(cgo.TRIANGLE_FAN)
+    if color:
+        obj.extend([cgo.COLOR, *color])
+    add_normal((0, 0, 1))
+    add_vertex((0, 0, height/2))
+    for i in range(sides * 2 + 1)[::-1]:
+        r = outer_radius if i % 2 == 0 else inner_radius
+        v = (r * sin(i * pi / sides), r * cos(i * pi / sides), height/2)
+        add_vertex(v)
+    obj.append(cgo.END)
+
+    # Bottom
+    obj.append(cgo.BEGIN)
+    obj.append(cgo.TRIANGLE_FAN)
+    if color:
+        obj.extend([cgo.COLOR, *color])
+    add_normal((0, 0, -1))
+    add_vertex((0, 0, -height/2))
+    angle = pi / sides
+    for i in range(sides * 2 + 1):
+        r = outer_radius if i % 2 == 0 else inner_radius
+        v = (r * sin(i * pi / sides), r * cos(i * pi / sides), -height/2)
+        add_vertex(v)
+    obj.append(cgo.END)
+
+    # Right side
+    for i in range(sides):
+        angle = 2 * pi * (i + 0.5) / sides
+        t1 = (inner_radius * sin(angle), inner_radius * cos(angle), height/2)
+        angle = 2 * pi * i / sides
+        t2 = (outer_radius * sin(angle), outer_radius * cos(angle), height/2)
+        angle = 2 * pi * (i + 0.5) / sides
+        b1 = (inner_radius * sin(angle), inner_radius * cos(angle), -height/2)
+        angle = 2 * pi * i / sides
+        b2 = (outer_radius * sin(angle), outer_radius * cos(angle), -height/2)
+        x1, x2 = cpv.sub(b1, t1), cpv.sub(b2, t1)
+        obj.append(cgo.BEGIN)
+        obj.append(cgo.TRIANGLE_STRIP)
+        if color:
+            obj.extend([cgo.COLOR, *color])
+        add_normal(cpv.cross_product(x1, x2))
+        add_vertex(b1)
+        add_vertex(b2)
+        add_vertex(t1)
+        add_vertex(t2)
+        obj.append(cgo.END)
+
+    # Left side
+    for i in range(sides):
+        angle = 2 * pi * (i - 0.5) / sides
+        t1 = (inner_radius * sin(angle), inner_radius * cos(angle), height/2)
+        angle = 2 * pi * i / sides
+        t2 = (outer_radius * sin(angle), outer_radius * cos(angle), height/2)
+        angle = 2 * pi * (i - 0.5) / sides
+        b1 = (inner_radius * sin(angle), inner_radius * cos(angle), -height/2)
+        angle = 2 * pi * i / sides
+        b2 = (outer_radius * sin(angle), outer_radius * cos(angle), -height/2)
+        x1, x2 = cpv.sub(b2, t2), cpv.sub(b1, t2)
+        obj.append(cgo.BEGIN)
+        obj.append(cgo.TRIANGLE_STRIP)
+        if color:
+            obj.extend([cgo.COLOR, *color])
+        add_normal(cpv.cross_product(x1, x2))
+        add_vertex(b2)
+        add_vertex(b1)
+        add_vertex(t2)
+        add_vertex(t1)
         obj.append(cgo.END)
 
     if not quiet:
