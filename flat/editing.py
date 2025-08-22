@@ -15,6 +15,99 @@
 
 from pymol import cmd, CmdException
 import numpy as np
+import sys
+
+@cmd.extend
+def wrap(selection="all", *, _self=cmd):
+    """
+    DESCRIPTION
+        Shift the contents of a given selection back into the unit cell.
+        ```
+        +-----------+            +-----------+
+        |       1-2-|-3-4  -->   |-3-4   1-2-|
+        +-----------+            +-----------+
+        ```
+    USAGE
+        wrap [ selection ]
+    ARGUMENTS
+        selection = str: atoms to consider {default: (all)}  
+    """
+    states = _self.count_states(selection)
+    for state in range(1, states + 1):
+        box = _self.get_symmetry(selection, state)[0:3]
+        xyz = _self.get_coords(selection, state)
+        # Apply PBC and update coordinates
+        _self.load_coords(xyz % box, selection, state)
+
+
+@cmd.extend
+def unwrap(selection="all", *, _self=cmd):
+    """
+    DESCRIPTION
+        Move all atoms in an selection so that bonds don't split over images
+        ```
+        +-----------+        +-----------+
+        |-3-4   1-2-|  -->   |       1-2-|-3-4
+        +-----------+        +-----------+
+        ```
+    USAGE
+        unwrap [ selection ]
+    ARGUMENTS
+        selection = str: atoms to consider {default: (all)}
+    """
+    # Get model object and modify it
+    model = _self.get_model(selection)
+    for i, atom in enumerate(model.atom):
+        # Ensure atom index matches it's array index
+        atom.index = i
+        atom.adjacent = []
+    for bond in model.bond:
+        atoms = [model.atom[i] for i in bond.index]
+        atoms[0].adjacent.append(atoms[1])
+        atoms[1].adjacent.append(atoms[0])
+
+    # Atoms we visited
+    VISITED = set()
+
+    def traverse(atom):
+        """Traverse bonded network"""
+        VISITED.add(atom.index)
+        network = {atom.index}
+        for other in atom.adjacent:
+            if other.index in VISITED:
+                continue
+            nt = traverse(other)
+            network.update(nt)
+        return network
+
+    # Get list of atoms indices in molecules
+    try:
+        # Increase recursion limit
+        limit = sys.getrecursionlimit()
+        sys.setrecursionlimit(10**5)
+        molecules = []
+        for atom in model.atom:
+            if atom.index in VISITED:
+                continue
+            nt = traverse(atom)
+            molecules.append(list(nt))
+    finally:
+        sys.setrecursionlimit(limit)
+
+    # Make molecules whole again
+    states = _self.count_states(selection)
+    for state in range(1, states + 1):
+        box = _self.get_symmetry(selection, state)[0:3]
+        xyz = _self.get_coords(selection, state)
+        for mol in molecules:
+            # Apply PBC according to reference (first) atom
+            r = xyz[mol]
+            dr = r - r[0]
+            r -= box * np.rint(dr / box)
+            # Check if COM is out of box put it back
+            com = np.mean(r, axis=0)
+            xyz[mol] = r - box * np.floor(com / box)
+        _self.load_coords(xyz, selection, state)
 
 
 @cmd.extend
@@ -169,6 +262,8 @@ def copy_identifiers(target, source, identifiers="segi chain resi",
 
 # Autocomplete
 cmd.auto_arg[0].update({
+    "wrap": cmd.auto_arg[0]["zoom"],
+    "unwrap": cmd.auto_arg[0]["zoom"],
     "align2eigen": cmd.auto_arg[0]["zoom"],
     "align2points": cmd.auto_arg[0]["zoom"],
     "split": cmd.auto_arg[0]["zoom"],
