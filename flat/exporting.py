@@ -16,6 +16,37 @@
 from pymol import cmd, CmdException
 import textwrap
 
+
+@cmd.extend
+def save_gro(filename, selection, state, *, _self=cmd):
+    """
+    DESCRIPTION
+        Save structure in GRO format.
+    USAGE
+        save_gro filename [, selection [, state ]]
+    """
+    with open(filename, "w") as f:
+        # Title
+        print("Generated with PyMOL", file=f)
+        # Number of atoms
+        print(_self.count_atoms(selection, state=state), file=f)
+        # Atoms positions
+        fmt = "{:5d}{:5s}{:>5s}{:5d}{:8.3f}{:8.3f}{:8.3f}"
+        callback = lambda *args: print(fmt.format(*args), file=f)
+        _self.iterate_state(
+            state,
+            selection,
+            "callback(int(resi), resn, name, index, x/10, y/10, z/10)",
+            space=locals()
+        )
+        # Box dimensions
+        try:
+            box = [x/10 for x in _self.get_symmetry(selection, state)[:3]]
+        except:
+            box = [0, 0, 0]
+        print("{:10.5f}{:10.5f}{:10.5f}".format(*box), file=f)
+
+
 @cmd.extend
 def save_csv(filename, selection="(all)", var="b", mode="atom", *, quiet=1, _self=cmd):
     """
@@ -267,6 +298,7 @@ def save_xyzr(filename, selection="(all)", state=1, *, _self=cmd):
 # Register extensions
 try:
     from pymol.exporting import savefunctions
+    savefunctions.setdefault("gro", save_gro)
     savefunctions.setdefault("csv", save_csv)
     savefunctions.setdefault("ndx", save_ndx)
     savefunctions.setdefault("pir", save_pir)
@@ -279,6 +311,7 @@ except ImportError:
 
 # Autocomplete
 cmd.auto_arg[1].update({
+    "save_gro": cmd.auto_arg[1]["save"],
     "save_csv": cmd.auto_arg[1]["save"],
     "save_ndx": cmd.auto_arg[1]["save"],
     "save_pir": cmd.auto_arg[1]["save"],
