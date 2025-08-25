@@ -14,6 +14,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from pymol import cmd, CmdException
+import numpy as np
 import collections
 import sys
 import io
@@ -399,6 +400,42 @@ def sculpt_homolog(mobile, target, state=1, cycles=1000, *, fix="restrain", quie
     _self.sculpt_iterate(mobile, state, cycles)
 
 
+@cmd.extend
+def sbond(atom1="(pk1)", atom2="(pk2)", length=2.0, state=1, cycles=1_000, *, _self=cmd):
+    """
+    DESCRIPTION
+        Bond two selected atoms and relax the structure
+    USAGE 
+        sbond [ atom1 [, atom2 [, length [, state, [, cycles ]]]]]
+    ARGUMENTS
+        atom1, atom2 = str: Atom selection to bond
+        length = str: Bond length {default: 2.0}
+        state = int: Selected state {default: 1}
+        cycles: Number of sculpt iterations {default: 1000}   
+    """
+    length = float(length)
+    # Get atoms positions
+    xyz_1 = _self.get_coords(atom1, state)
+    xyz_2 = _self.get_coords(atom2, state)
+    if xyz_1.size != 3 or xyz_2.size != 3:
+        raise CmdException("Invalid selection")
+    # Caclulate new coordinates
+    c = (xyz_1 + xyz_2) / 2
+    v = (xyz_2 - xyz_1)
+    v /= np.linalg.norm(v)
+    # Update coordinates and minimize object with sculpting
+    (object, ) = _self.get_object_list(f"{atom1}|{atom2}")
+    _self.sculpt_activate(object, state)
+    _self.load_coords(c - length / 2 * v, atom1, state)
+    _self.load_coords(c + length / 2 * v, atom2, state)
+    _self.flag("fix", f"{atom1} or {atom2}", "set")
+    _self.sculpt_iterate(object, state, cycles)
+    _self.flag("fix", f"{atom1} or {atom2}", "clear")
+    # Form a bond between selection
+    # NOTE: This must be the last step otherwise procedure will not work
+    _self.bond(atom1, atom2)
+
+
 # Autocomplete
 cmd.auto_arg[0].update({
     "mutate": cmd.auto_arg[0]["zoom"],
@@ -409,10 +446,12 @@ cmd.auto_arg[0].update({
     "fix_h": cmd.auto_arg[0]["zoom"],
     "update_align": cmd.auto_arg[0]["align"],
     "sculpt_homolog": cmd.auto_arg[0]["align"],
+    "sbond": cmd.auto_arg[0]["zoom"],
 })
 cmd.auto_arg[1].update({
     "mutate": [cmd.Shortcut(three_letter.values()), "residue", ""],
     "update_align": cmd.auto_arg[1]["align"],
     "sculpt_homolog": cmd.auto_arg[1]["align"],
+    "sbond": cmd.auto_arg[0]["zoom"],
 })
 
