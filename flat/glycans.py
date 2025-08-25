@@ -27,8 +27,8 @@ glycan_one_letter = {
 }
 
 glycan_colors = {
-    "Y": "flat.green",  # Man
-    "M": "flat.blue",  # GlcNAc
+    "Y": "flat.blue",  # Man
+    "M": "flat.green",  # GlcNAc
     "V": "flat.yellow",  # GalNAc
     "L": "flat.yellow",  # Gal
     "F": "flat.red",  # Fuc
@@ -36,8 +36,8 @@ glycan_colors = {
 }
 
 glycan_shapes = {
-    "Y": "sphere",  # Man
-    "M": "cube",  # GlcNAc
+    "Y": "cube",  # Man
+    "M": "sphere",  # GlcNAc
     "V": "cube",  # GalNAc
     "L": "sphere",  # Gal
     "F": "cone",  # Fuc
