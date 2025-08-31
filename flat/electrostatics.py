@@ -60,7 +60,7 @@ def set_charges_and_radii(obj_name, quiet=1, *, _self=cmd):
     NOTES
         Function has it's own fair share of problems. Use with caution!
     """
-    from chempy.champ import assign
+    from pymol.chempy.champ import assign
 
     quiet = int(quiet)
 
