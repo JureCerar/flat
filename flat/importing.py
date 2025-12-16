@@ -16,7 +16,8 @@
 from pymol import cmd, CmdException
 import collections
 import re
-
+import io
+import csv
 
 @cmd.extend
 def load_all(pattern, group='', quiet=1, *, _self=cmd, **kwargs):
@@ -36,63 +37,84 @@ def load_all(pattern, group='', quiet=1, *, _self=cmd, **kwargs):
 
 
 @cmd.extend
-def load_csv(filename, selection="(all)", var="b", vis=0, *, _self=cmd):
+def load_csv(filename, selection="(all)", prop=None, var="b", vis=0, *, _self=cmd):
     """
     DESCRIPTION
-        Load property from CSV file to selection.
+        Load property from CSV file to selection. Atom selector is automaticaly
+        generated from CSV header.
     USAGE
-        load_csv filename [, selection [, var [, vis ]]]
+        load_csv filename [, selection [, prop [, var [, vis ]]]]
     ARGUMENTS
         filename = str: Input file name.
         selection = str: Atom selection. {default: all}
-        var = str: Property to save. {default: b}
+        prop = str: Property name to import (first by default). {default: None}
+        var = str: Variable where property is saved. {default: b}
         vis = int: Visualize output. {default: 1}
     """
-    vis = bool(vis)
-    if len(_self.get_object_list(selection)) > 1:
-        raise CmdException("Multiple objects in selection.")
+    class FactoryCounter:
+        def __init__(self, factory):
+            self.factory = factory
+            self.count = 0
 
-    data = collections.defaultdict(float)
-    with open(filename, "r") as handle:
-        # From header try to guess CSV format
-        col = handle.readline().split(",")
-        if len(col) == 5:
-            mode = "atom"
-        elif len(col) == 4:
-            mode = "res"
+        def __call__(self):
+            self.count += 1
+            return self.factory()
+
+    with open(filename, "r") as f:
+        lines = f.read()
+
+    if not csv.Sniffer().has_header(lines):
+        raise CmdException("CSV file does not contain header")
+    
+    reader = csv.DictReader(
+        io.StringIO(lines),
+        dialect=csv.Sniffer().sniff(lines),
+    )
+
+    # Valid PyMol selectors
+    SELECTORS = ["object", "symbol", "name", "resn", "resi", "alt",
+                 "chain", "segi", "flag", "id", "index", "ss",]
+    selector = list()
+    for fieldname in reader.fieldnames:
+        if fieldname in SELECTORS:
+            selector.append(fieldname)
+    if not selector:
+        raise ValueError("No selector rows found in CSV file")
+    selector_key = ",".join(selector)
+
+    if prop:
+        if prop not in reader.fieldnames:
+            raise ValueError("Property not found in CSV file")
+    else:
+        # Select first valid property
+        for fieldname in reader.fieldnames:
+            if fieldname not in SELECTORS:
+                prop = fieldname
+                break
         else:
-            raise CmdException("Cannot determine CSV file format from header")
+            raise ValueError("No property rows found in CSV file")
 
-        # Read the data from the rest of the file
-        for line in handle:
-            col = line.strip().split(",")
-            key, val = tuple(col[:-1]), col[-1]
-            data[key] = float(val)
+    data = collections.defaultdict(factory := FactoryCounter(float))
+    for row in reader:
+        key = tuple(row[_] for _ in selector)
+        data[key] = row[prop]
 
-    if mode == "atom":
-        # Set property by atom
-        _self.alter(
-            selection,
-            "{} = data[chain, resn, resi, name]".format(var),
-            space=locals(),
-        )
-    elif mode == "res":
-        # Set property by residues
-        _self.alter(
-            selection,
-            "{} = data[chain, resn, resi]".format(var),
-            space=locals(),
-        )
+    _self.alter(selection, f"{var}=data[{selector_key}]", space=locals())
 
-    # Visualize the property
+    # Give dictionary miss count
+    if factory.count:
+        print(f"Warning: {factory.count} atom(s) were not found in CSV file")
+
     if vis:
         palette = ["marine", "silver", "red"]
         obj = _self.get_object_list(selection)[0]
-        range = (min(data.values()), max(data.values()))
-        _self.spectrum(var, " ".join(palette), selection, range[0], range[1])
-        _self.ramp_new("ramp", obj, range, palette)
+        values = list()
+        _self.iterate(selection, f"values.append({var})", space=locals())
+        vmin, vmax = min(values), max(values)
+        _self.spectrum(var, " ".join(palette), selection, vmin, vmax)
+        _self.ramp_new(f"{prop}_ramp", obj, (vmin, vmax), palette)
 
-    return
+    return data
 
 
 @cmd.extend

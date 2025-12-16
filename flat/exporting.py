@@ -15,7 +15,7 @@
 
 from pymol import cmd, CmdException
 import textwrap
-
+import csv
 
 @cmd.extend
 def save_gro(filename, selection, state, *, _self=cmd):
@@ -48,7 +48,7 @@ def save_gro(filename, selection, state, *, _self=cmd):
 
 
 @cmd.extend
-def save_csv(filename, selection="(all)", var="b", mode="atom", *, quiet=1, _self=cmd):
+def save_csv(filename, selection="(all)", selector=None, var="b", *, quiet=1, _self=cmd):
     """
     DESCRIPTION
         Save property from selection to CSV file.
@@ -57,42 +57,27 @@ def save_csv(filename, selection="(all)", var="b", mode="atom", *, quiet=1, _sel
     ARGUMENTS
         file = str: Output file name.
         selection = str: Atom selection. {default: all}
+        selector = list[str]: List of atom selectors to export properties.
+            If None it is stored as `chain`, `resn`, `resi`, and `name" {default: "atom"}
         var = str: Property to save. {default: b}
-        mode = str: Iterator mode: atom or res. {default: "atom"}
     """
-    if len(_self.get_object_list(selection)) > 1:
-        raise CmdException("Multiple objects in selection.")
+    if not selector:
+        selector = ["chain", "resn", "resi", "name"]
+    selector_key = ",".join(selector)
 
-    data = []
-    if mode.lower() == "atom":
-        # Iterate by atoms
-        data.append(["chain", "resn", "resi", "name", "value"])
-        _self.iterate(
-            selection,
-            "data.append([chain, resn, resi, name, {}])".format(var),
-            space=locals(),
-        )
+    # NOTE: Load to dict to make sure output has one entry per selector; If there
+    # are multiple atoms that fit selector just store last one and say it's a feature
+    data = dict()
+    _self.iterate(selection, f"data[{selector_key}]={var}", space=locals())
 
-    elif mode.lower() == "res":
-        # Iterate by residues
-        data.append(["chain", "resn", "resi", "value"])
-        _self.iterate(
-            f"bca. ({selection})",
-            "data.append([chain, resn, resi, {}])".format(var),
-            space=locals(),
-        )
-
-    else:
-        raise CmdException(f"Invalid mode: '{mode}'")
-
-    with open(filename, "w") as f:
-        for line in data:
-            print(*line, sep=",", file=f)
+    with open(filename, "w", newline="") as f:
+        writer = csv.writer(f,)
+        writer.writerow(selector + [var])
+        for key, val in data.items():
+            writer.writerow([*key, val])
 
     if not int(quiet):
-        print(f'Save: wrote "{filename}"')
-
-    return
+        print(f"Save: Wrote '{filename}'")
 
 
 @cmd.extend
