@@ -542,6 +542,8 @@ menu.all_colors_list.append(
 )
 
 # Novartis colors and palettes 
+cmd.set_color("nvs.orange", [255, 78, 0])  #ff4e00
+cmd.set_color("nvs.cream", [201, 217, 249])  #c9d9f9
 cmd.set_color("nvs.blue", [4, 96, 169])  #0460a9
 cmd.set_color("nvs.deep", [0, 32, 104])  #002068
 cmd.set_color("nvs.coral", [255, 88, 93])  #ff585d
@@ -550,6 +552,8 @@ cmd.set_color("nvs.light", [208, 208, 208])  #d0d0d0
 cmd.set_color("nvs.gray", [167, 167, 167])  #a7a7a7
 menu.all_colors_list.append(
     ("novartis", [
+        ("930", "nvs.orange"),
+        ("789", "nvs.cream"),
         ("036", "nvs.blue"),
         ("014", "nvs.deep"),
         ("933", "nvs.coral"),
