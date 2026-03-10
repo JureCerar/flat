@@ -63,7 +63,7 @@ def abnumber(selection="(all)", scheme="imgt", *, _self=cmd):
         )
 
         try:
-            cdr = Chain(seqbuilder(seq_list), scheme)
+            cdr = Chain(seqbuilder(seq_list), scheme, use_anarcii=True)
         except ChainParseError:
             print("Warning: Variable chain sequence not recognized")
             continue
