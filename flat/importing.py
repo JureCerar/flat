@@ -175,7 +175,7 @@ def load_ndx(filename, quiet=0, *, _self=cmd):
     def get_keyword(string):
         """ Scan a string for keywords i.e. '[ keyword ]' """
         k = re.search(r'\[(.*?)\]', string)
-        return k.string.split()[1] if k else None
+        return k.string.strip() if k else None
 
     current = None
     for line in open(filename, "r"):
