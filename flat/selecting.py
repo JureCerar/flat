@@ -38,51 +38,35 @@ def find_seq(pattern, selection="all", name="sele", merge=False, *, _self=cmd):
 
     merge = bool(merge)
 
-    # Check input parameters
     if len(pattern) == 0 or not isinstance(pattern, str):
         raise CmdException("Search sequence not provided")
     if len(selection) == 0 or not isinstance(selection, str):
         raise CmdException("Invalid selection or object")
     if len(name) == 0 or not isinstance(name, str):
         raise CmdException("Invalid name for the selection")
+    
+    regex = re.compile(pattern.upper())
 
-    # Create a temporary selection
-    sele = _self.get_unused_name("_temp")
-    _self.select(sele, selection)
+    # Merge or create new selection
+    _self.select(name, "None", merge=merge)
 
-    try:
-        # Iterate over residue selection
-        residues = []
-        _self.iterate(
-            f"bca. ({sele})",
-            "residues.append((resi, resn, chain))",
-            space=locals()
-        )
-
-        # Extract residues IDs, AA string, and chains
-        indices = [_[0] for _ in residues]
-        sequence = ''.join([one_letter.get(_[1], "-") for _ in residues])
-        chains = [_[2] for _ in residues]
-
-        # make an empty selection to which we add residues
-        _self.select(name, 'None', merge=merge)
-
-        regex = re.compile(pattern.upper())
-        for m in regex.finditer(sequence):
-            (start, stop) = m.span()
-            # Are all selected residues from one chain?
-            sele_chains = chains[start:stop]
-            if len(set(sele_chains)) != 1:
-                continue
-            # Form a residue selection
-            sele_indices = "+".join(indices[i] for i in range(start, stop))
-            _self.select(
-                name,
-                f"{name} or ({sele} & i. {sele_indices} & c. '{sele_chains[0]}')",
-                merge=merge
+    for object in _self.get_object_list(selection):
+        for chain in _self.get_chains(f"o. {object}"):
+            residues = []
+            _self.iterate(
+                f"bca. ({selection}) and o. {object} and c. {chain}",
+                "residues.append((resi, resn))",
+                space=locals()
             )
-    finally:
-        _self.delete(sele)
+            sequence = "".join([one_letter.get(r[1], "-") for r in residues])
+            for m in regex.finditer(sequence):
+                (start, stop) = m.span()
+                indices = "+".join(residues[i][0] for i in range(start, stop))
+                _self.select(
+                    name,
+                    f"({selection}) and o. {object} and c. {chain} and i. {indices}",
+                    merge=True
+                )
 
     return name
 
