@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2025 Jure Cerar
+# Copyright (C) 2023-2026 Jure Cerar
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,9 +18,9 @@ FLAT is a collection of scripts and utilities for PyMOL molecular visualizer.
 """
 
 __author__ = "Jure Cerar"
-__copyright__ = "Copyright (C) 2023-2025 Jure Cerar"
+__copyright__ = "Copyright (C) 2023-2026 Jure Cerar"
 __license__ = "GNU GPL v3.0"
-__version__ = "0.6.2"
+__version__ = "0.7.0"
 
 try:
     from pymol import cmd
