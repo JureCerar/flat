@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2024 Jure Cerar
+# Copyright (C) 2023-2026 Jure Cerar
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -275,7 +275,6 @@ class Palette(list):
         return Color(value)
 
 
-
 @cmd.extend
 def cbo(selection="(all)", *, _self=cmd):
     """
@@ -285,7 +284,7 @@ def cbo(selection="(all)", *, _self=cmd):
         cbc [ selection ]
     """
     color = itertools.cycle(_color_cycle)
-    for obj in cmd.get_names("public_objects", 0, selection):
+    for obj in _self.get_names("public_objects", 0, selection):
         _self.color(next(color), f"({selection}) & %{obj}")
     return
 
@@ -314,11 +313,15 @@ def cbe(selection="(all)", *, _self=cmd, **kwargs):
     EXAMPLE
         cbe (all), C=green, oxygen=red
     """
-    _self.color("white", f"({selection}) & e. H")
-    _self.color("blue", f"({selection}) & e. N")
-    _self.color("red", f"({selection}) & e. O")
-    _self.color("yellow", f"({selection}) & e. S")
-    for element, color in kwargs.items():
+    colors = {
+        "H": "white",
+        "N": "blue",
+        "O": "red",
+        "S": "yellow",
+        "P": "orange",
+    }
+    colors.update(**kwargs)
+    for element, color in colors.items():
         _self.color(color, f"({selection}) & e. {element}")
     return
 

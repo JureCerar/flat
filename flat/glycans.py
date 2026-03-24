@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2025 Jure Cerar
+# Copyright (C) 2023-2026 Jure Cerar
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,22 +26,13 @@ glycan_one_letter = {
     "NAG": "Y", "BM3": "W", "SIA": "S", "SLB": "S",
 }
 
-glycan_colors = {
-    "Y": "flat.blue",  # Man
-    "M": "flat.green",  # GlcNAc
-    "V": "flat.yellow",  # GalNAc
-    "L": "flat.yellow",  # Gal
-    "F": "flat.red",  # Fuc
-    "S": "flat.purple",  # Sia
-}
-
-glycan_shapes = {
-    "Y": "cube",  # Man
-    "M": "sphere",  # GlcNAc
-    "V": "cube",  # GalNAc
-    "L": "sphere",  # Gal
-    "F": "cone",  # Fuc
-    "S": "octahedron",  # Sia
+glycan_repr = {
+    "Y": ("cube", "flat.blue"),  # Man
+    "M": ("sphere", "flat.green"),  # GlcNAc
+    "V": ("cube", "flat.yellow"),  # GalNAc
+    "L": ("sphere", "flat.yellow"),  # Gal
+    "F": ("cone", "flat.red"),  # Fuc
+    "S": ("octahedron", "flat.purple"),  # Sia
 }
 
 
@@ -99,7 +90,7 @@ def _get_ring(selection: str, _self=cmd):
 
 
 @cmd.extend
-def snfg(selection="all", state=0, size=2.0,  name=None,  *, shapes=None, colors=None, _self=cmd):
+def snfg(selection="all", state=0, size=2.0, width=0.5, name=None,  *, shape_color=None, _self=cmd):
     """
     DESCRIPTION
         Show Standard Notation For Glycans (SNFG)
@@ -109,21 +100,22 @@ def snfg(selection="all", state=0, size=2.0,  name=None,  *, shapes=None, colors
         selection = str: Atom selection {default: all}
         state = int: Object state (0 for current state) {default: 0}
         size = float: Size of output shapes {default: 2.0}
+        width = float: Width of bonds between shapes {default: 0.5}
         name = str: Name of output group {default: "SNFG"}
     REFERENCE
         https://www.ncbi.nlm.nih.gov/glycans/snfg.html
     SEE ALSO
         cube, cone, sphere, star, octahedron
     """
-    state, size = int(state), float(size)
+    state, size, width = int(state), float(size), float(width)
 
-    # Extend shape and color dictionary
-    _glycan_shapes = glycan_shapes
-    if shapes:
-        _glycan_shapes.update(shapes)
-    _glycan_colors = glycan_colors
-    if colors:
-        _glycan_colors.update(colors)
+    # Scale factor is there for all shapes to _appear_ the same size
+    SCALE = 1.73
+
+    # Extend glycan dictionary
+    _glycan_repr = glycan_repr.copy()
+    if shape_color:
+        _glycan_repr.update(shape_color)
 
     # Get residue list
     residues = []
@@ -146,8 +138,9 @@ def snfg(selection="all", state=0, size=2.0,  name=None,  *, shapes=None, colors
             bond = sorted([res, neighbor])
             bonds.append(tuple(bond))
 
-    # Calculate centers of each residue
+    # Process each glycan: center, normal, color, and shape
     means, normals = dict(), dict()
+    colors, shapes = dict(), dict()
     for res in residues:
         ring = _get_ring("/{}/{}/{}/{}`{}".format(*res), _self)
         names = "+".join(ring)
@@ -162,21 +155,31 @@ def snfg(selection="all", state=0, size=2.0,  name=None,  *, shapes=None, colors
                 np.cross((coord[i] - coord[i - 1]), (mean - coord[i])) +
                 np.cross((coord[i + 1] - coord[i]), (mean - coord[i]))
             ))
-        norm = np.mean(normal, axis=0)
+        # NOTE: Invert normal
         means[res] = mean
-        normals[res] = norm
-
+        normals[res] = -np.mean(normal, axis=0)
+        try:
+            key = _get_glycan(res[3])
+            shape, color = _glycan_repr.get(key)
+        except KeyError as e:
+            print(f"Error: Unknown residue: {e}")
+            # Default settings for unknown residues
+            shape, color = (None, "gray")
+        colors[res] = _self.get_color_tuple(color)
+        shapes[res] = shape
+        
+    # Objects for drawing
     obj = []
 
     # Draw bonds
-    color = (0.5, 0.5, 0.5)  # gray
     for a1, a2 in set(bonds):
         # Ignore amino acid residues
         if any(_ not in residues for _ in (a1, a2)):
             continue
         try:
             xyz1, xyz2 = means[a1], means[a2]
-            o = [cgo.CYLINDER, *xyz1, *xyz2, 0.5, *color, *color]
+            color1, color2 = colors[a1], colors[a2]
+            o = [cgo.CYLINDER, *xyz1, *xyz2, width, *color1, *color2]
             obj.extend(o)
         except KeyError as e:
             print(f"Error: Unknown residue: {e}")
@@ -186,19 +189,17 @@ def snfg(selection="all", state=0, size=2.0,  name=None,  *, shapes=None, colors
         try:
             mean = means[res]
             norm = normals[res]
-            key = _get_glycan(res[3])
-            shape = _glycan_shapes.get(key, None)
-            color = _glycan_colors.get(key, "white")
-            # NOTE: 1.73 scale factor is there for all shapes to appear same size
+            shape = shapes[res]
+            color = colors[res]
             if shape == "cube":
-                length = 1.73 * np.array([size, size, size])
+                length = SCALE * np.array([size, size, size])
                 o = cube(mean, norm, 0, length, color)
             elif shape == "cone":
-                o = cone(mean, norm, size, 1.73 * size, color)
+                o = cone(mean, norm, size, SCALE * size, color)
             elif shape == "octahedron":
-                o = octahedron(mean, norm, 0, 1.73 * size, color)
+                o = octahedron(mean, norm, 0, SCALE * size, color)
             elif shape == "star":
-                o = star(mean, norm, 0, 5, (size, 0.5 * size), 1.73 * size, color)
+                o = star(mean, norm, 0, 5, (size, 0.5 * size), SCALE * size, color)
             else:
                 o = sphere(mean, norm, size, color)
             obj.extend(o)

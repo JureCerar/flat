@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2024 Jure Cerar
+# Copyright (C) 2023-2026 Jure Cerar
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -33,10 +33,13 @@ def beautify(selection="all", mode=0, *, _self=cmd):
     _self.hide("everything", selection)
     _self.show("wire", f"{selection} and ! polymer.protein")
     _self.show("cartoon", f"{selection} and polymer.protein")
-    _self.show(
-        ["line", "licorice", "wire"][mode],
-        f"((byres ({selection})) & (sc. | (n. CA | n. N & r. PRO)))"
-    )
+    if mode == 1:
+        repr = "licorice"
+    elif mode == 2:
+        repr = "wire"
+    else:
+        repr = "line"
+    _self.show(repr, f"((byres ({selection})) & (sc. | (n. CA | n. N & r. PRO)))")
     _self.hide(f"({selection} and hydro and (e. C extend 1))")
     _self.color("atomic", f"({selection}) and ! e. C")
     return
@@ -81,43 +84,43 @@ def filter(mode=1, *, _self=cmd):
         # Simple FLAT style
         # See: https://bionerdnotes.wordpress.com/2018/11/12/getting-high-quality-pictures-in-pymol/
         # cmd.color("cmky")
-        cmd.set("alignment_as_cylinders", 1)
-        cmd.set("cartoon_highlight_color", "gray75")
-        cmd.set("cartoon_sampling", 14)
-        cmd.set("depth_cue", 1)
-        cmd.set("dot_as_spheres", 1)
-        cmd.set("hash_max", 300)
-        cmd.set("line_as_cylinders", 1)
-        cmd.set("mesh_as_cylinders", 1)
-        cmd.set("nb_spheres_quality", 3)
-        cmd.set("nonbonded_as_cylinders", 1)
-        cmd.set("ray_shadows", 0)
-        cmd.set("ray_trace_color", "black")
-        cmd.set("ray_trace_fog", 0.0)
-        cmd.set("ray_trace_mode", 1)
-        cmd.set("ribbon_as_cylinders", 1)
-        cmd.set("ribbon_sampling", 10)
-        cmd.set("specular", 0.0)
-        cmd.set("surface_quality", 1)
+        _self.set("alignment_as_cylinders", 1)
+        _self.set("cartoon_highlight_color", "gray75")
+        _self.set("cartoon_sampling", 14)
+        _self.set("depth_cue", 1)
+        _self.set("dot_as_spheres", 1)
+        _self.set("hash_max", 300)
+        _self.set("line_as_cylinders", 1)
+        _self.set("mesh_as_cylinders", 1)
+        _self.set("nb_spheres_quality", 3)
+        _self.set("nonbonded_as_cylinders", 1)
+        _self.set("ray_shadows", 0)
+        _self.set("ray_trace_color", "black")
+        _self.set("ray_trace_fog", 0.0)
+        _self.set("ray_trace_mode", 1)
+        _self.set("ribbon_as_cylinders", 1)
+        _self.set("ribbon_sampling", 10)
+        _self.set("specular", 0.0)
+        _self.set("surface_quality", 1)
     elif mode == 2:
         # Pretty figure style
-        cmd.bg_color("white")
-        cmd.set("specular", 0)
-        cmd.set("ambient", 0.3)
-        cmd.set("direct", 1.0)
-        cmd.set("ray_trace_mode", 1)
-        cmd.set("stick_radius", 0.2)
-        cmd.set("cartoon_tube_radius", 0.2)
-        cmd.set("cartoon_fancy_helices", 1)
-        cmd.set("cartoon_cylindrical_helices", 0)
-        cmd.set("cartoon_flat_sheets", 1.0)
-        cmd.set("cartoon_smooth_loops", 0)
-        cmd.set("cartoon_highlight_color", "grey50")
-        cmd.set("antialias", 1)
-        cmd.set("hash_max", 300)
+        _self.bg_color("white")
+        _self.set("specular", 0)
+        _self.set("ambient", 0.3)
+        _self.set("direct", 1.0)
+        _self.set("ray_trace_mode", 1)
+        _self.set("stick_radius", 0.2)
+        _self.set("cartoon_tube_radius", 0.2)
+        _self.set("cartoon_fancy_helices", 1)
+        _self.set("cartoon_cylindrical_helices", 0)
+        _self.set("cartoon_flat_sheets", 1.0)
+        _self.set("cartoon_smooth_loops", 0)
+        _self.set("cartoon_highlight_color", "grey50")
+        _self.set("antialias", 1)
+        _self.set("hash_max", 300)
     else:
         # Set back to defaults
-        cmd.reinitialize("settings")
+        _self.reinitialize("settings")
     return
 
 
@@ -186,12 +189,11 @@ def axis(name="axis", *, _self=cmd):
     USAGE
         axis [ name ]
     """
-    cmd.set("auto_zoom", 0)
+    _self.set("auto_zoom", 0)
     width = 0.06  # cylinder width
     length = 0.75  # cylinder length
     hight = 0.25  # cone hight
     d = width * 1.618  # cone base diameter
-
     obj = [
         cgo.CYLINDER, 0.0, 0.0, 0.0, length, 0.0, 0.0, width, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0,
         cgo.CYLINDER, 0.0, 0.0, 0.0, 0.0, length, 0.0, width, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0,

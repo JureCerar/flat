@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2025 Jure Cerar
+# Copyright (C) 2023-2026 Jure Cerar
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -202,7 +202,7 @@ def cylinder(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
         normal = _self.safe_list_eval(normal)
     if color and isinstance(color, str):
         color = _self.get_color_tuple(color)
-    else:
+    elif not color:
         color = (1, 1, 1)  #ffffff
 
     obj = []
@@ -247,7 +247,7 @@ def cone(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
         normal = _self.safe_list_eval(normal)
     if color and isinstance(color, str):
         color = _self.get_color_tuple(color)
-    else:
+    elif not color:
         color = (1, 1, 1)  # white
 
     obj = []
