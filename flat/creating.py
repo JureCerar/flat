@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2024 Jure Cerar
+# Copyright (C) 2023-2026 Jure Cerar
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -192,6 +192,55 @@ def com(selection="all", object=None, state=0, *, quiet=1, _self=cmd):
             x, y, z = _self.centerofmass(selection, state=i+1)
             _self.pseudoatom(object, pos=[x, y, z], state=i+1)
             _self.show("spheres", object)
+
+
+@cmd.extend
+def fragment(name, object=None, origin=1, zoom=0, quiet=1, *, _self=cmd):
+    """
+    DESCRIPTION
+        "fragment" retrieves a 3D structure from the fragment library,
+        which is currently pretty meager.
+    USAGE
+        fragment name [, object [, origin [, zoom ]]]
+    ARGUMENTS
+        name = string: Name of library fragment 
+        object = string: Name of object to create {default: None}
+        origin = boolean: Center fragment at the current position {default: True}
+        zoom = boolean: Zoom view to fit fragment {default: False}
+    NOTE
+        This is an overloaded version of the 'fragment' function
+    """
+    import chempy
+    import os
+
+    if object is None:
+        object = name
+
+    r = cmd.DEFAULT_ERROR
+
+    # First try to get model from default library
+    chempy_path = os.path.join(chempy.path, "fragments", name + ".pkl")
+    flatcat_path = os.path.join(os.path.dirname(__file__),
+                                "fragments", name + ".pkl")
+    if os.path.isfile(chempy_path):
+        path = chempy_path
+    elif os.path.isfile(flatcat_path):
+        path = flatcat_path
+    else:
+        raise CmdException(f"Unable to load fragment: '{name}'")
+
+    model = chempy.io.pkl.fromFile(path)
+    la = len(model.atom)
+    if la and int(origin):
+        position = _self.get_position()
+        for c in range(0, 3):
+            mean_c = sum([a.coord[c] for a in model.atom]) / la
+            mean_c = position[c] - mean_c
+            for a in model.atom:
+                a.coord[c] += mean_c
+    r = _self.load_model(model, str(object), quiet=quiet,
+                         zoom=zoom, _self=_self)
+    return r
 
 
 # Autocomplete

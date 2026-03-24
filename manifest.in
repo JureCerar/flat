@@ -1,1 +1,2 @@
 include flat/data/*.npy
+include flat/fragments/*.pkl
