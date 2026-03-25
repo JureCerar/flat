@@ -14,6 +14,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from pymol import cmd, CmdException
+from . import three_letter
 
 sidechain_center_atoms = {
     "GLY": ("CA",),
@@ -248,6 +249,7 @@ cmd.auto_arg[0].update({
     "sidechain_centers": cmd.auto_arg[0]["zoom"],
     "aromatic_centers": cmd.auto_arg[0]["zoom"],
     "com": cmd.auto_arg[0]["zoom"],
+    "fragment": [cmd.Shortcut(three_letter.values()), "residue", ""],
 })
 
 cmd.auto_arg[2].update({

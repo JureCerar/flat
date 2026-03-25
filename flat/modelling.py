@@ -125,13 +125,18 @@ def relax(selection, backbone=1, neighbors=1, cycles=100, state=0, *, _self=cmd)
 
 
 @cmd.extend
-def mutate(selection, residue, sculpt=0, cycles=100, *, _self=cmd):
+def mutate(selection, name, sculpt=0, cycles=100, *, _self=cmd):
     """
     DESCRIPTION
         Mutate a single residue and select best rotamer. Optionally
         fit lowest energy mutant rotamer to structure.
     USAGE
-        mutate selection, residue [, sculpt [, cycles ]]
+        mutate selection, name [, sculpt [, cycles ]]
+    ARGUMENTS
+        selection = string: atom selection to renumber.
+        name = str: Name of fragment to insert. 
+        sculpt = bool: sculpt inserted residue. {default: 1}
+        cycles: Number of sculpt iterations. {default: 100}
     """
     from . import three_letter
     sculpt, cycles = int(sculpt), int(cycles)
@@ -139,13 +144,13 @@ def mutate(selection, residue, sculpt=0, cycles=100, *, _self=cmd):
     if len(_self.get_model(selection).get_residues()) != 1:
         raise CmdException("Multiple residues in selection.")
 
-    if len(residue) == 1:
-        residue = three_letter.get(residue, residue)
+    if len(name) == 1:
+        name = three_letter.get(name, name)
 
     try:
         _self.wizard("mutagenesis")
         _self.do("refresh_wizard")
-        _self.get_wizard().set_mode(residue.upper())
+        _self.get_wizard().set_mode(name.upper())
         _self.get_wizard().do_select(f"byres ({selection})")
 
         scores = _self.get_wizard().bump_scores
@@ -166,48 +171,102 @@ def mutate(selection, residue, sculpt=0, cycles=100, *, _self=cmd):
 
 
 @cmd.extend
-def insert(selection, fragment, sculpt=0, cycles=100, *, _self=cmd):
+def replace(selection, name, sculpt=0, cycles=100, *, quiet=1, _self=cmd):
     """
     DESCRIPTION
-        Replace target residue with fragment. Use for non-standard residues. 
+        Replace target residue with fragment. Use for ONLY for non-standard residues.
     USAGE
-        insert target, frag [, out ]
+        insert selection, name [, sculpt [, cycles ]]
+    ARGUMENTS
+        selection = string: atom selection to renumber.
+        name = str: Name of fragment to insert. 
+        sculpt = bool: sculpt inserted residue. {default: 1}
+        cycles: Number of sculpt iterations. {default: 100}
+    SEE ALSO
+        mutate
     """
+    try:
+        from .creating import fragment
+    except ImportError:
+        from pymol import fragment
+
     sculpt, cycles = int(sculpt), int(cycles)
+    name = str(name).upper()
 
     if len(_self.get_model(selection).get_residues()) != 1:
         raise CmdException("Multiple residues in selection.")
-    if len(_self.get_model(fragment).get_residues()) != 1:
-        raise CmdException("Multiple residues in fragment.")
 
-    temp = _self.get_unused_name("_tmp")
-    _self.create(temp, fragment, source_state=1, target_state=1)
+    sele_name = _self.get_unused_name("replace")
+    _self.select(sele_name, selection)
 
-    model = _self.get_object_list(selection)[0]
-    at = _self.get_model(selection).atom[0]
-    segi, chain, resi = at.segi, at.chain, int(at.resi)
-    _self.alter(temp, f"segi,chain,resi='{segi}','{chain}',{resi}")
+    # Get prev and next residue
+    prev_name = _self.get_unused_name("prev")
+    _self.select(prev_name, f"(neighbor {selection}) & name C")
+    next_name = _self.get_unused_name("next")
+    _self.select(next_name, f"(neighbor {selection}) & name N")
 
-    _self.align(
-        mobile=f"({temp}) & n. O+C+N",
-        target=f"({selection}) & n. O+C+N",
-    )
+    # Get carbonyl position
+    _self.iterate_state(1, f"{selection} and name O",
+                        "stored.list=[x,y,z]")
 
-    _self.remove(selection)
-    _self.fuse(model, temp, mode=3)
-    _self.edit()
+    try:
+        # Create fragment
+        frag_name = _self.get_unused_name("tmp")
+        fragment(name, frag_name)
 
-    _self.bond(
-        atom1=f"/{model}/{segi}/{chain}/`{resi-1}/C",
-        atom2=f"/{model}/{segi}/{chain}/`{resi}/N",
-    )
-    _self.bond(
-        atom1=f"/{model}/{segi}/{chain}/`{resi}/C",
-        atom2=f"/{model}/{segi}/{chain}/`{resi+1}/N",
-    )
+        # Copy properties to fragment
+        model = _self.get_object_list(selection)[0]
+        at = _self.get_model(selection).atom[0]
+        segi, chain, resi = at.segi, at.chain, at.resi
+        _self.alter(frag_name, f"segi,chain,resi='{segi}','{chain}',{resi}")
 
-    if sculpt > 0:
-        relax(f"/{model}/{segi}/{chain}/`{resi}", 1, 1, cycles)
+        # Align fragment to target
+        if (_self.count_atoms(f"({sele_name} & name CB)") == 1 and
+                _self.count_atoms(f"({frag_name} & name CB)") == 1):
+            _self.pair_fit(
+                f"({frag_name} & name CA)",
+                f"({sele_name} & name CA)",
+                f"({frag_name} & name CB)",
+                f"({sele_name} & name CB)",
+                f"({frag_name} & name C)",
+                f"({sele_name} & name C)",
+                f"({frag_name} & name N)",
+                f"({sele_name} & name N)",
+                quiet=quiet
+            )
+        else:
+            _self.pair_fit(
+                f"({frag_name} & name CA)",
+                f"({sele_name} & name CA)",
+                f"({frag_name} & name C)",
+                f"({sele_name} & name C)",
+                f"({frag_name} & name N)",
+                f"({sele_name} & name N)",
+                quiet=quiet
+            )
+
+        # Remove original residue and attach
+        _self.remove(sele_name)
+        _self.fuse(frag_name, model, mode=3)
+        _self.edit()
+
+        # now connect them
+        new_res = f"/{model}/{segi}/{chain}/`{resi}"
+        _self.bond(f"{new_res}/N", prev_name)
+        _self.bond(f"{new_res}/C", next_name)
+        _self.alter_state(1, f"{new_res}/O",
+                          "(x,y,z)=stored.list")  # fix carbonyl
+        _self.h_fix(new_res)
+
+        if sculpt > 0:
+            relax(new_res, 1, 1, cycles)
+
+    finally:
+        # Clean up
+        _self.delete(prev_name)
+        _self.delete(next_name)
+        _self.delete(sele_name)
+        _self.delete(frag_name)
 
     return
 
@@ -441,7 +500,7 @@ cmd.auto_arg[0].update({
     "mutate": cmd.auto_arg[0]["zoom"],
     "relax": cmd.auto_arg[0]["zoom"],
     "mutate": cmd.auto_arg[0]["zoom"],
-    "insert": cmd.auto_arg[0]["zoom"],
+    "replace": cmd.auto_arg[0]["zoom"],
     "add_missing_atoms": cmd.auto_arg[0]["zoom"],
     "fix_h": cmd.auto_arg[0]["zoom"],
     "update_align": cmd.auto_arg[0]["align"],
@@ -450,6 +509,7 @@ cmd.auto_arg[0].update({
 })
 cmd.auto_arg[1].update({
     "mutate": [cmd.Shortcut(three_letter.values()), "residue", ""],
+    "replace": [cmd.Shortcut(three_letter.values()), "residue", ""],
     "update_align": cmd.auto_arg[1]["align"],
     "sculpt_homolog": cmd.auto_arg[1]["align"],
     "sbond": cmd.auto_arg[0]["zoom"],
