@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2024 Jure Cerar
+# Copyright (C) 2023-2026 Jure Cerar
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,73 +16,8 @@
 from pymol import cmd, CmdException
 import numpy as np
 import collections
-import sys
 import io
 from . import three_letter
-
-
-@cmd.extend
-def renumber(selection, start=1, quiet=False, *, _self=cmd):
-    """
-    DESCRIPTION
-        Renumber sets new residue numbers (resi) for a polymer based on connectivity. 
-    ARGUMENTS
-        selection = string: atom selection to renumber {default: all}
-        start = integer: counting start {default: 1}
-    """
-    # See: https://pymolwiki.org/index.php/Renumber
-    start, quiet = int(start), bool(quiet)
-    model = _self.get_model(selection)
-    limit = sys.getrecursionlimit()
-    sys.setrecursionlimit(10**5)
-    _self.iterate(
-        selection,
-        "next(atom_it).model = model",
-        space={
-            "atom_it": iter(model.atom),
-            "next": next,
-        }
-    )
-
-    startatom = model.atom[0]
-    for atom in model.atom:
-        atom.adjacent = []
-        atom.visited = False
-    for bond in model.bond:
-        atoms = [model.atom[i] for i in bond.index]
-        atoms[0].adjacent.append(atoms[1])
-        atoms[1].adjacent.append(atoms[0])
-    minmax = [start, start]
-
-    def traverse(atom, resi):
-        atom.resi = resi
-        atom.visited = True
-        for other in atom.adjacent:
-            if other.visited:
-                continue
-            if (atom.name, other.name) in [("C", "N"), ("O'", "P")]:
-                minmax[1] = resi + 1
-                traverse(other, resi + 1)
-            elif (atom.name, other.name) in [("N", "C"), ("P", "O3'")]:
-                minmax[0] = resi - 1
-                traverse(other, resi - 1)
-            elif (atom.name, other.name) not in [("SG", "SG")]:
-                traverse(other, resi)
-        return
-
-    traverse(startatom, start)
-    _self.alter(
-        selection,
-        "resi = next(atom_it).resi",
-        space={
-            "atom_it": iter(model.atom),
-            "next": next,
-        }
-    )
-    sys.setrecursionlimit(limit)
-    if not quiet:
-        print(" Renumber: range (%d to %d)" % tuple(minmax))
-    return tuple(minmax)
 
 
 @cmd.extend
@@ -138,7 +73,6 @@ def mutate(selection, name, sculpt=0, cycles=100, *, _self=cmd):
         sculpt = bool: sculpt inserted residue. {default: 1}
         cycles: Number of sculpt iterations. {default: 100}
     """
-    from . import three_letter
     sculpt, cycles = int(sculpt), int(cycles)
     
     if len(_self.get_model(selection).get_residues()) != 1:
@@ -438,7 +372,7 @@ def update_align(mobile, target, state=1, *, fix="none", quiet=1, _self=cmd):
 
 
 @cmd.extend
-def sculpt_homolog(mobile, target, state=1, cycles=1000, *, fix="restrain", quiet=1, _self=cmd):
+def sculpt_homolog(mobile, target, state=1, cycles=1_000, *, fix="restrain", quiet=1, _self=cmd):
     """
     DESCRIPTION
         Sculpt mobile towards target, based on sequence alignment.
@@ -478,7 +412,7 @@ def sbond(atom1="(pk1)", atom2="(pk2)", length=2.0, state=1, cycles=1_000, *, _s
     xyz_2 = _self.get_coords(atom2, state)
     if xyz_1.size != 3 or xyz_2.size != 3:
         raise CmdException("Invalid selection")
-    # Caclulate new coordinates
+    # Calculate new coordinates
     c = (xyz_1 + xyz_2) / 2
     v = (xyz_2 - xyz_1)
     v /= np.linalg.norm(v)

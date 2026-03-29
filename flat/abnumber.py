@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2025 Jure Cerar
+# Copyright (C) 2023-2026 Jure Cerar
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,13 +18,14 @@ from pymol import cmd, CmdException
 
 _CDR_SCHEMES = ["imgt", "chothia", "kabat", "aho"]
 """Antibody numbering schemes"""
-
+ 
 
 @cmd.extend
 def abnumber(selection="(all)", scheme="imgt", *, _self=cmd):
     """
     DESCRIPTION
-        Antibody numbering and antigen receptor classification
+        Select antibody CDR region according to Antibody Numbering
+        and Antigen Receptor Classification (ANARCI)
     USAGE
         abnumber [ selection [, scheme [, exe ]]]
     ARGUMENTS
@@ -33,9 +34,8 @@ def abnumber(selection="(all)", scheme="imgt", *, _self=cmd):
     SCHEMES
         imgt, kabat, chothia, aho
     SEE ALSO
-        ...
+        https://github.com/prihoda/AbNumber
     """
-    from . import one_letter
     from abnumber import Chain
     from abnumber.exceptions import ChainParseError
 
@@ -44,41 +44,139 @@ def abnumber(selection="(all)", scheme="imgt", *, _self=cmd):
     if scheme not in _CDR_SCHEMES:
         raise CmdException(f"Invalid numbering scheme: '{scheme}'")
 
-    def seqbuilder(seq_list):
-        result = ""
-        for resn in seq_list:
-            if resn in one_letter:
-                result += one_letter[resn]
-            else:
-                print(f"Warning: Unknown residue '{resn}'")
-                result += "-"
-        return result
-
     for chain in _self.get_chains(selection):
-        seq_list = []
-        _self.iterate(
-            f"(bca. {selection} & c. {chain}) & polymer",
-            "seq_list.append(resn)",
-            space=locals(),
-        )
+        subsele = f"({selection}) & c. {chain}"
+
+        # Get sequence
+        fasta = cmd.get_fastastr(subsele)
+        seq = "".join(fasta.splitlines()[1:])
 
         try:
-            cdr = Chain(seqbuilder(seq_list), scheme, use_anarcii=True)
+            cdr = Chain(seq, scheme, use_anarcii=True)
         except ChainParseError:
             print("Warning: Variable chain sequence not recognized")
             continue
 
-        subsele = f"{selection} & c. {chain}"
+        # Create selection
         name = _self.get_unused_name(f"{chain}_CDR", 0)
         _self.select(name, f"{subsele} & pepseq {cdr.cdr1_seq}", 0, merge=1)
         _self.select(name, f"{subsele} & pepseq {cdr.cdr2_seq}", 0, merge=1)
         _self.select(name, f"{subsele} & pepseq {cdr.cdr3_seq}", 0, merge=1)
 
 
+@cmd.extend
+def abrenumber(selection="(all)", scheme="imgt", *, _self=cmd):
+    """
+    DESCRIPTION
+        Renumber and rename (chains) antibodies according to 
+        Antibody Numbering and Antigen Receptor Classification (ANARCI)
+    USAGE
+        abrenumber [ selection [, scheme [, exe ]]]
+    ARGUMENTS
+        selection = str: Atom selection. {default: all}
+        scheme = str: Which numbering scheme should be used. {default: imgt}
+    SCHEMES
+        imgt, kabat, chothia, aho
+    SEE ALSO
+        https://github.com/prihoda/AbNumber
+    """
+    import sys
+    from abnumber import Chain
+    from abnumber.exceptions import ChainParseError
+
+    if len(_self.get_object_list(selection)) > 1:
+        raise CmdException("Multiple objects in selection")
+    if scheme not in _CDR_SCHEMES:
+        raise CmdException(f"Invalid numbering scheme: '{scheme}'")
+
+    # Raise recursion limit for large molecules
+    limit = sys.getrecursionlimit()
+    sys.setrecursionlimit(10**5)
+
+    hc_name, lc_name = "H", "L"
+
+    for chain in _self.get_chains(selection):
+        subsele = f"({selection}) & c. {chain}"
+
+        # Get sequence
+        fasta = _self.get_fastastr(subsele)
+        seq = "".join(fasta.splitlines()[1:])
+
+        try:
+            cdr = Chain(seq, scheme, use_anarcii=True)
+        except ChainParseError:
+            print("Warning: Variable chain sequence not recognized")
+            continue
+
+        # Get ordered list of residue indices
+        abnum = []
+        for pos, aa in cdr:
+            abnum.append(str(pos)[1:])
+        last = int(abnum[-1])
+
+        # Alter model for BFS
+        # See: https://pymolwiki.org/index.php/Renumber
+        model = _self.get_model(subsele)
+        startatom = model.atom[0]
+        for atom in model.atom:
+            atom.adjacent = []
+            atom.visited = False
+        for bond in model.bond:
+            atoms = [model.atom[i] for i in bond.index]
+            atoms[0].adjacent.append(atoms[1])
+            atoms[1].adjacent.append(atoms[0])
+
+        # Traverse selection and increment index if we pass C-N bond
+        # between two peptides.
+        def traverse(atom, i):
+            if i < len(abnum):
+                atom.resi = abnum[i]
+            else:
+                atom.resi = last + (i - len(abnum))
+            atom.visited = True
+            for other in atom.adjacent:
+                if other.visited:
+                    continue
+                if (atom.name, other.name) in [("C", "N"), ("O'", "P")]:
+                    traverse(other, i + 1)
+                elif (atom.name, other.name) in [("N", "C"), ("P", "O3'")]:
+                    traverse(other, i - 1)
+                elif (atom.name, other.name) not in [("SG", "SG")]:
+                    traverse(other, i)
+            return
+
+        # Let's do this
+        traverse(startatom, 0)
+        _self.alter(
+            subsele,
+            "resi = next(atom_it).resi",
+            space={
+                "atom_it": iter(model.atom),
+                "next": next,
+            }
+        )
+
+        # Alter chain names
+        if cdr.is_heavy_chain():
+            _self.alter(subsele, f"chain='{hc_name}'")
+            hc_name = chr(ord(hc_name) + 1)
+        else:
+            _self.alter(subsele, f"chain='{lc_name}'")
+            lc_name = chr(ord(lc_name) + 1)
+
+    # Set back original recursion limit
+    # that we don't break anything
+    sys.setrecursionlimit(limit)
+    
+    return
+
+
 # Autocomplete
 cmd.auto_arg[0].update({
     "abnumber": cmd.auto_arg[0]["zoom"],
+    "abrenumber": cmd.auto_arg[0]["zoom"],
 })
 cmd.auto_arg[1].update({
     "abnumber": [cmd.Shortcut(_CDR_SCHEMES), "scheme", ""],
+    "abrenumber": [cmd.Shortcut(_CDR_SCHEMES), "scheme", ""],
 })

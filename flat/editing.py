@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2024 Jure Cerar
+# Copyright (C) 2023-2026 Jure Cerar
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,7 +18,71 @@ import numpy as np
 import sys
 
 # Available options for atom unwrapping
-_unwrap_modes = ["residues", "chains", "segments", "bonds"]
+_UNWRAP_MODES = ["residues", "chains", "segments", "bonds"]
+
+
+@cmd.extend
+def renumber(selection, start=1, quiet=False, *, _self=cmd):
+    """
+    DESCRIPTION
+        Renumber sets new residue numbers (resi) for a polymer based on connectivity. 
+    ARGUMENTS
+        selection = string: atom selection to renumber {default: all}
+        start = integer: counting start {default: 1}
+    """
+    # See: https://pymolwiki.org/index.php/Renumber
+    start, quiet = int(start), bool(quiet)
+    model = _self.get_model(selection)
+    limit = sys.getrecursionlimit()
+    sys.setrecursionlimit(10**5)
+    _self.iterate(
+        selection,
+        "next(atom_it).model = model",
+        space={
+            "atom_it": iter(model.atom),
+            "next": next,
+        }
+    )
+
+    startatom = model.atom[0]
+    for atom in model.atom:
+        atom.adjacent = []
+        atom.visited = False
+    for bond in model.bond:
+        atoms = [model.atom[i] for i in bond.index]
+        atoms[0].adjacent.append(atoms[1])
+        atoms[1].adjacent.append(atoms[0])
+    minmax = [start, start]
+
+    def traverse(atom, resi):
+        atom.resi = resi
+        atom.visited = True
+        for other in atom.adjacent:
+            if other.visited:
+                continue
+            if (atom.name, other.name) in [("C", "N"), ("O'", "P")]:
+                minmax[1] = resi + 1
+                traverse(other, resi + 1)
+            elif (atom.name, other.name) in [("N", "C"), ("P", "O3'")]:
+                minmax[0] = resi - 1
+                traverse(other, resi - 1)
+            elif (atom.name, other.name) not in [("SG", "SG")]:
+                traverse(other, resi)
+        return
+
+    traverse(startatom, start)
+    _self.alter(
+        selection,
+        "resi = next(atom_it).resi",
+        space={
+            "atom_it": iter(model.atom),
+            "next": next,
+        }
+    )
+    sys.setrecursionlimit(limit)
+    if not quiet:
+        print(" Renumber: range (%d to %d)" % tuple(minmax))
+    return tuple(minmax)
 
 
 @cmd.extend
@@ -306,6 +370,7 @@ def copy_identifiers(target, source, identifiers="segi chain resi",
 
 # Autocomplete
 cmd.auto_arg[0].update({
+    "renumber": cmd.auto_arg[0]["zoom"],
     "wrap": cmd.auto_arg[0]["zoom"],
     "unwrap": cmd.auto_arg[0]["zoom"],
     "align2eigen": cmd.auto_arg[0]["zoom"],
@@ -315,5 +380,5 @@ cmd.auto_arg[0].update({
     "copy_identifiers": cmd.auto_arg[0]["zoom"]
 })
 cmd.auto_arg[1].update({
-    "unwrap": [cmd.Shortcut(_unwrap_modes), "method", ""],
+    "unwrap": [cmd.Shortcut(_UNWRAP_MODES), "method", ""],
 })
