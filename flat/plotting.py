@@ -25,7 +25,6 @@ Module for plotting data within PyMOL.
 """
 
 from pymol import cmd, CmdException
-import matplotlib.pyplot as plt
 import numpy as np 
 import warnings
 from pathlib import Path
@@ -89,6 +88,8 @@ def plot(expression="b", selection="all", fmt="-", byres=True,
         : matplotlib.figure.Figure
             Figure object.
     """
+    import matplotlib.pyplot as plt
+
     fig, ax = plt.subplots()
     lines = []
     labels = []
@@ -169,6 +170,7 @@ def plot_contacts(selection="guide", metric="euclidean", *,
     SOURCE
         From PSICO (c) 2011-2012 Thomas Holder, MPI for Developmental Biology
     """
+    import matplotlib.pyplot as plt
     from .numeric import pdist_squareform
 
     X = _self.get_coords(selection, int(state))
@@ -214,6 +216,7 @@ def plot_ramachandran(selection="guide", fmt=".", state=-1, ref=1,
     SEE ALSO
         :func:`phi_psi`
     """
+    import matplotlib.pyplot as plt
     fig, ax = plt.subplots()
 
     ax.axis([-180, 180, -180, 180])

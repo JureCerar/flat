@@ -3,8 +3,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Flat(Cat) documentation
-=======================
+FlatCAT documentation
+=====================
 
 .. image:: static/flatcat.png
    :width: 400px
@@ -13,7 +13,7 @@ Flat(Cat) documentation
 :Version: |release|
 :Date: |today|
 
-**Flat** is personal collection of scripts and utilities that extend functionality of PyMOL molecular visualization tool. The inspiration behind the library is to learn how to work with PyMOL and create a collection of useful functions for easy and convenient use. It is heavily inspired and borrows (i.e. *shamelessly steals*) ideas from `Pymol ScrIpt COllection (PSICO)`_.
+**FlatCAT** is personal collection of scripts and utilities that extend functionality of PyMOL molecular visualization tool. The inspiration behind the library is to learn how to work with PyMOL and create a collection of useful functions for easy and convenient use. It is heavily inspired and borrows (i.e. *shamelessly steals*) ideas from `Pymol ScrIpt COllection (PSICO)`_.
 
 Source code is available in the public GitHub repository: https://github.com/JureCerar/flat
 
@@ -29,7 +29,7 @@ The package can be installed by cloning the repository_ and running:
 Usage
 -----
 
-Once installed, you can import and initialize flat in PyMOL by typing:
+Once installed, you can import and initialize package in PyMOL by typing:
 
 .. code-block:: python
 
@@ -37,7 +37,7 @@ Once installed, you can import and initialize flat in PyMOL by typing:
 
 .. note::
 
-   To import **Flat** package in PyMOL at startup, add this to your `~/.pymolrc.py` file or add it in PyMOL under `File` → `Edit pymolrc`.
+   To import **FlatCAT** package in PyMOL at startup, add this to your `~/.pymolrc.py` file or add it in PyMOL under `File` → `Edit pymolrc`.
 
 You can then use built-in help in PyMOL to get command documentation:
 
@@ -48,7 +48,7 @@ You can then use built-in help in PyMOL to get command documentation:
 Getting help
 ------------
 
-Please report bugs and feature requests for **Flat** through the `Issue Tracker`_.
+Please report bugs and feature requests for **FlatCAT** through the `Issue Tracker`_.
 
 Contributing
 ------------

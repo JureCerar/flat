@@ -14,9 +14,9 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-FLAT
-====
-FLAT is personal collection of scripts and utilities that extend functionality
+FlatCAT
+=======
+FlatCAT is personal collection of scripts and utilities that extend functionality
 of PyMOL molecular visualization tool. The inspiration behind the library is to
 learn how to work with PyMOL and create a collection of useful functions for easy
 and convenient use.
