@@ -32,7 +32,7 @@ PyMOL> help flat
 ```
 ## Documentation
 
-Documentation is available online at: https://app.readthedocs.org
+Documentation is available online at [Read the Docs](https://flatcat.readthedocs.io/en/latest/).
 
 ## Getting help
 

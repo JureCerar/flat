@@ -25,7 +25,7 @@ Source code is available in the public GitHub repository: https://github.com/Jur
 
 Documentation
 -------------
-Documentation is available online at: https://app.readthedocs.org
+Documentation is available online at: https://flatcat.readthedocs.io/en/latest/
 """
 
 __author__ = "Jure Cerar"
