@@ -13,18 +13,30 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from pymol import cmd, CmdException
-import tempfile
-import subprocess
-import os
+"""
+:mod:`flat.propka`
+==================
+Module for computing pKa values of ionizable groups using `PROPKA`_.
 
-from . import one_letter
+Installation
+------------
+You can easily install PROPKA with:
+
+.. code:: bash
+
+    pip install propka
+
+.. PROPKA:
+    https://propka.readthedocs.io/en/latest/
+"""
+
+from pymol import cmd
 
 # TODO:
 # - Add propka_plot function 
 
 @cmd.extend
-def propka(selection="all", state=0, filename=None, vis=1, optargs=[], *, _self=cmd):
+def propka(selection="all", state=0, filename=None, vis=1, optargs=[], *, quiet=0, _self=cmd):
     """
     DESCRIPTION
         Predicts the pKa values of ionizable groups in proteins and
@@ -32,25 +44,34 @@ def propka(selection="all", state=0, filename=None, vis=1, optargs=[], *, _self=
     USAGE
         propka [ selection [, state [, file [, vis [, optargs ]]]]]
     ARGUMENTS
-        selection = str: Atom selection. {default: all}
-        state = int: Object state (0 for all states). {default: 0}
-        filename = str: Save PROPKA output to file. {default: None}
-        vis = bool: Visualize residue pKa values. {default: True}
-        optargs = list: Optional arguments to be passed to PROPKA. {default: []}
+        selection : str, optional
+            Atom selection.
+        state : int, default = 0
+            Object state (0 for all states).
+        filename : str, optional
+            Save PROPKA output to file.
+        vis : bool, default = True
+            Visualize residue pKa values.
+        optargs : List[str], optional
+            Optional arguments to be passed to PROPKA.
+    RETURNS
+        : propka.MolecularContainer
+            Propka model for selection.
+    REFERENCE
+        https://propka.readthedocs.io/en/latest/
     """
     # See: https://propka.readthedocs.io/en/latest/api.html
     # See: https://tuilab.github.io/tui/update/2017/02/21/propka.html
     import propka.run as pk
-
-    state, vis = int(state), int(vis)
+    import tempfile
  
     # Save PDB file and process it with PROPKA
     with tempfile.NamedTemporaryFile(suffix=".pdb", delete=False) as tmp:
-        _self.save(tmp.name, selection, state)
+        _self.save(tmp.name, selection, int(state))
         pka = pk.single(tmp.name, optargs, None, False)
 
     # Show ionizable groups
-    if vis:
+    if int(vis):
         _self.show(
             "lines",
             f"((byres ({selection})) & (sc.|(n. CA|n. N&r. PRO)))"
@@ -69,6 +90,10 @@ def propka(selection="all", state=0, filename=None, vis=1, optargs=[], *, _self=
                 )
                 _self.label(atom, label)
                 _self.show("spheres", atom)
+    
+    if not int(quiet):
+        pi_folded, pi_unfolded = pka.get_pi()
+        print(f"Util: pI = {pi_folded:.2f} ({pi_unfolded:.2f})")
 
     # Save file
     if filename:

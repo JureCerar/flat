@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2024 Jure Cerar
+# Copyright (C) 2023-2026 Jure Cerar
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,18 +13,33 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""
+:mod:`flat.importing`
+=====================
+Module that allows to load files in additional formats.
+"""
+
 from pymol import cmd, CmdException
 import collections
 import re
 import io
 import csv
 
+
 @cmd.extend
 def load_all(pattern, group='', quiet=1, *, _self=cmd, **kwargs):
-    '''
+    """
     DESCRIPTION
         Load all files matching given globbing pattern
-    '''
+    USAGE
+        ...
+    ARGUMENTS
+        ...
+    
+    .. warning::
+
+            Not yet implemented.
+    """
     # import glob
     # import os
     # TODO: Idea structure first, everything else later
@@ -37,19 +52,27 @@ def load_all(pattern, group='', quiet=1, *, _self=cmd, **kwargs):
 
 
 @cmd.extend
-def load_csv(filename, selection="(all)", prop=None, var="b", vis=0, *, _self=cmd):
+def load_csv(filename, selection="all", prop=None, var="b", vis=True, *, _self=cmd):
     """
     DESCRIPTION
-        Load property from CSV file to selection. Atom selector is automaticaly
+        Load property from CSV file to selection. Atom selector is automatically
         generated from CSV header.
     USAGE
         load_csv filename [, selection [, prop [, var [, vis ]]]]
     ARGUMENTS
-        filename = str: Input file name.
-        selection = str: Atom selection. {default: all}
-        prop = str: Property name to import (first by default). {default: None}
-        var = str: Variable where property is saved. {default: b}
-        vis = int: Visualize output. {default: 1}
+        filename : str
+            Input file name.
+        selection : str, default = 'all'
+            Atom selection.
+        prop : str, optional
+            Property name to import (first by default).
+        var : str, default = 'b'
+            Variable where property is saved.
+        vis : int, default = True
+            Visualize output.
+    RETURNS
+        : Dict
+            Dictionary of atom identifiers and corresponding values.
     """
     class FactoryCounter:
         def __init__(self, factory):
@@ -105,7 +128,7 @@ def load_csv(filename, selection="(all)", prop=None, var="b", vis=0, *, _self=cm
     if factory.count:
         print(f"Warning: {factory.count} atom(s) were not found in CSV file")
 
-    if vis:
+    if int(vis):
         palette = ["marine", "silver", "red"]
         obj = _self.get_object_list(selection)[0]
         values = list()
@@ -118,12 +141,22 @@ def load_csv(filename, selection="(all)", prop=None, var="b", vis=0, *, _self=cm
 
 
 @cmd.extend
-def load_topol(filename, selection="(all)", *, _self=cmd):
+def load_topol(filename, selection="all", *, _self=cmd):
     """
     DESCRIPTION
         Load GROMACS topology (.top) file to selection.
+        
+        .. note::
+
+            Experimental, currently supports only limited number of properties.
+
     USAGE
         load_topol filename [, selection ]
+    ARGUMENTS
+        filename : str
+            Input file name.
+        selection : str, default = 'all'
+            Atom selection.
     """
     atom_list = collections.defaultdict(lambda: [0, 0])
     current = None
@@ -158,7 +191,6 @@ def load_topol(filename, selection="(all)", *, _self=cmd):
         "partial_charge, mass = atom_list[index]",
         space=locals()
     )
-    return
 
 
 @cmd.extend
@@ -167,9 +199,11 @@ def load_ndx(filename, quiet=0, *, _self=cmd):
     DESCRIPTION
         Read a GROMACS index (.ndx) file as a selection.
     USAGE
-        read_ndx filename [, quiet ]
+        read_ndx filename
+    ARGUMENTS
+        filename : str
+            Input file name.
     """
-    quiet = int(quiet)
     groups = dict()
 
     def get_keyword(string):
@@ -195,11 +229,11 @@ def load_ndx(filename, quiet=0, *, _self=cmd):
             name = name + "_"
 
         if len(group) == 0:
-            print(" Empty group: '%s'" % name)
+            print(f"Warning: Empty group: {name!r}")
             continue
 
-        if not quiet:
-            print("Loading group: '{}' ({} atoms)".format(name, len(group)))
+        if not int(quiet):
+            print(f"Loading group: {name!r} ({len(group)} atoms)")
 
         # Pymol does not like long selection strings so we select the group iteratively
         every = 15
@@ -208,14 +242,28 @@ def load_ndx(filename, quiet=0, *, _self=cmd):
             buffer = "index " + "+".join(str(x) for x in group[i:i+every])
             _self.select(name, f"({name}) | {buffer}", quiet=1)
 
-    return
-
 
 @cmd.extend
-def load_smi(filename, oname="", discrete=-1, quiet=1, multiplex=None, zoom=-1, _self=cmd):
+def load_smi(filename, object=None, discrete=-1, multiplex=None, zoom=-1, quiet=0, *, _self=cmd):
     """
     DESCRIPTION
-        Load a SMILES file with an openbabel backend
+        Load a SMILES file using OpenBabel as backend.
+    USAGE
+        load_smi filename [, name [, discrete [, multiplex [, zoom ]]]]
+    ARGUMENTS
+        filename : str
+            Path or URL to the file to load.
+        object : str, default = None
+            Name of Pymol object to store the structure in. Defaults to the filename prefix.
+        discrete : int
+            For multi-model structures, a value of 0 indicates that models
+            have the same set of atoms (e.g. trajectory files or NMR structures),
+            allowing memory savings, while a value of 1 forces the creation of
+            independent atom sets for each model.
+        multiplex : integer, default = None
+            Load a multi-model file as separate objects instead of states.
+        zoom : int, default = -1
+            Use auto_zoom setting.
     SOURCE
         From PSICO (c) 2011 Thomas Holder, MPI for Developmental Biology
     """
@@ -223,43 +271,44 @@ def load_smi(filename, oname="", discrete=-1, quiet=1, multiplex=None, zoom=-1, 
     import subprocess
     import os
 
-    if not oname:
-        oname = os.path.basename(filename).rsplit(".", 1)[0]
+    if not object:
+        object = os.path.basename(filename).rsplit(".", 1)[0]
 
-    outfile = tempfile.mktemp(".sdf")
-
-    try:
-        subprocess.check_call(["obabel", filename, "-O", outfile, "--gen3D"])
-        _self.load(outfile, oname, discrete=discrete, quiet=quiet,
+    with tempfile.NamedTemporaryFile(suffix=".sdf") as tmp:
+        subprocess.check_call(["obabel", filename, "-O", tmp, "--gen3D"])
+        _self.load(tmp, object, discrete=discrete, quiet=quiet,
                    multiplex=multiplex, zoom=zoom)
-    finally:
-        os.remove(outfile)
 
 
 @cmd.extend
 def load_aln(filename, object=None, mobile=None, target=None, mobile_id=None,
-             target_id=None, format='', transform=0, quiet=1, *, _self=cmd):
-    '''
+             target_id=None, format=None, transform=0, quiet=1, *, _self=cmd):
+    """
     DESCRIPTION
         Load a pairwise alignment from file and apply it to two loaded structures.
     USAGE
         load_aln filename [, object [, mobile [, target [, mobile_id [, target_id [, format ]]]]]]
     ARGUMENTS
-        filename = string: alignment file
-        object = string: name of the object {default: filename prefix}
-        mobile, target = string: atom selections {default: ids from alignment file}
-        mobile_id, target_id = string: ids from alignment file {default: first two}
-        format = string: file format, see http://biopython.org/wiki/AlignIO
-        {default: guess from first line in file}
-    SOURCE
-        From PSICO (c) 2011 Thomas Holder, MPI for Developmental Biology
+        filename : str
+            Path to alignment file.
+        object : str, optional
+            Name of the object. Defaults to the filename prefix.
+        mobile, target : str, optional
+            Atom selections to align. By default uses IDs from alignment file.
+        mobile_id, target_id : str, optional
+            IDs from alignment file. Use first two by default.
+        format : str, default = None
+            File format. By default try to guess from first line in file.
+            See http://biopython.org/wiki/AlignIO
     EXAMPLE
         >>> fetch 1bz4 1cpr, async=0
         >>> super 1bz4 and guide, 1cpr and guide, object=aln1, window=5
         >>> save /tmp/super.aln, aln1
         >>> delete aln1
         >>> load_aln /tmp/super.aln, aln2, format=clustal
-    '''
+    SOURCE
+        From PSICO (c) 2011 Thomas Holder, MPI for Developmental Biology
+    """
     import os
     from . import one_letter
     from .seqalign import needle_alignment, alignment_mapping, alignment_read

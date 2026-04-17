@@ -13,8 +13,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from pymol import cmd, CmdException, cgo
+"""
+:mod:`flat.querying`
+====================
+Module for querying data from molecular objects.
+"""
+
+from pymol import cmd, CmdException
 import numpy as np
+
 
 @cmd.extend
 def count(selection="all", *, _self=cmd):
@@ -24,7 +31,8 @@ def count(selection="all", *, _self=cmd):
     USAGE
         count [ selection ]
     ARGUMENTS
-        selection = str: Atom selection. {default: all}
+        selection : str, optional
+            Atom selection.
     """
     # Get model
     model = _self.get_model(f"({selection})")
@@ -54,8 +62,10 @@ def length(selection="all", num=10, *, _self=cmd):
     USAGE
         length [ selection [, num ]]
     ARGUMENTS
-        selection = str: Atom selection. {default: all}
-        num = str: Number of list items to display. {default: 10}
+        selection : str, optional
+            Atom selection.
+        num : int, default = 10
+            Number of list items to display.
     """
     num = int(num)
     if len(_self.get_object_list(selection)) > 1:
@@ -78,28 +88,40 @@ def length(selection="all", num=10, *, _self=cmd):
             string += ", ... "
             string += str(lst[upper:])[1:]
         return string
-    
+
     # Chains
-    chain = _self.get_chains(selection)
-    print("Chains:", len(chain), truncate(chain, num))
+    chains = _self.get_chains(selection)
+    print("Chains:", len(chains), truncate(chains, num))
     # Residues
-    residue = [int(model.atom[i].resi) for i in range(model.nAtom)]
-    residue = list(dict.fromkeys(residue))
-    print("Residues:", len(residue), truncate(residue, num))
+    residues = [int(model.atom[i].resi) for i in range(model.nAtom)]
+    residues = list(dict.fromkeys(residues))
+    print("Residues:", len(residues), truncate(residues, num))
     # Atoms
     atoms = [model.atom[i].index for i in range(model.nAtom)]
     atoms = list(dict.fromkeys(atoms))
     print("Atoms:", len(atoms), truncate(atoms, num))
-    return
 
 
 @cmd.extend
-def get_sasa(selection, state=0, dot_density=4, *, quiet=1, _self=cmd):
+def get_sasa(selection="polymer", state=0, dot_density=4, *, quiet=1, _self=cmd):
     """
     DESCRIPTION
-        Get solvent accesible surface area for selection.
+        Get solvent accessible surface area for selection.
     USAGE
         get_sasa selection [, state [, dot_density ]]
+    ARGUMENTS
+        selection : str, optional
+            Atom selection.
+        state : int, default = 0
+            Object state (0 for all states).
+        dot_density : int, default = 4
+            Sampling density (1-4). Higher density (more dots) means higher
+            accuracy but slower performance. 
+    RETURNS
+        : float
+            Solvent accessible surface area in square Angstroms.
+    SEE ALSO
+        get_area, get_sasa_relative
     """
     state, dot_density, quiet = int(state), int(dot_density), int(quiet)
     if state < 1:
@@ -121,6 +143,16 @@ def iterate_to_list(selection, expression, *, space=None, _self=cmd):
         Capture "iterate" results in a list.
     USAGE
         iterate_to_list selection, expression
+    ARGUMENTS
+        selection : str
+            Atom selection.
+        expression : str
+            Property or list of properties in valid PyMOL syntax.
+        space : Dict(), optional
+            Namespace dictionary. Defaults to PyMOL namespace.
+    RETURNS
+        : List
+            List of specified properties for selection.
     """
     outlist = []
     _self.iterate(
@@ -136,14 +168,25 @@ def ext_coef(selection="all", state=-1, *, quiet=0, _self=cmd):
     """
     DESCRIPTION
         Calculate extinction coefficient and absorbance for native and folded protein.
+        Extinction coefficients are in units of M^-1 cm^-1, at 280 nm measured in water.
     USAGE
         ext_coef [ selection [, state ]]
-    LITERATURE
-        C.N. Pace, et. al, Protein Sci., 1995, doi:10.1002/pro.5560041120
-        H. Edelhoch, Biochemistry, 1967, doi:10.1021/bi00859a010
-        C.G. Gill & P.H. von Hippel, Anal. Biochem., 1989, doi:10.1016/0003-2697(89)90602-7
+    ARGUMENTS
+        selection : str, optional
+            Atom selection.
+        state : int, default = -1
+            Object state (-1 for current state).
+    RETURNS
+        coef, abs : float
+            Extinction coefficients and absorbance for native protein.
+        coef0, abs0 : float
+            Extinction coefficients and absorbance for denatured protein.
+    REFERENCE
+        * C.N. Pace, et. al, Protein Sci., 1995, doi:10.1002/pro.5560041120
+        * H. Edelhoch, Biochemistry, 1967, doi:10.1021/bi00859a010
+        * C.G. Gill & P.H. von Hippel, Anal. Biochem., 1989, doi:10.1016/0003-2697(89)90602-7
     """
-    state, quiet = int(state), int(quiet)
+    state = int(state) 
     nW = _self.count_atoms(f"({selection}) & resn TRP & guide", state=state)
     nY = _self.count_atoms(f"({selection}) & resn TYR & guide", state=state)
     nS = _self.count_atoms(f"({selection}) & resn CYS+CYS2 & guide", state=state)
@@ -156,7 +199,7 @@ def ext_coef(selection="all", state=-1, *, quiet=0, _self=cmd):
     abs = coef / mass
     coef0 = nW * 5500 + nY * 1490
     abs0 = coef0 / mass
-    if not quiet:
+    if not int(quiet):
         print("Extinction coefficients are in units of M^-1 cm^-1, at 280 nm measured in water.")
         print("")
         print(f"Ext. coefficient: {coef:.0f}")
@@ -169,12 +212,24 @@ def ext_coef(selection="all", state=-1, *, quiet=0, _self=cmd):
 
 
 @cmd.extend
-def get_seq(selection, chainbreak="/", unknown="X", quiet=1, *, _self=cmd):
+def get_seq(selection, chainbreak="/", unknown="?", quiet=1, *, _self=cmd):
     """
     DESCRIPTION
         Gets the one-letter sequence, including residues without coordinates.
     USAGE
         get_seq selection [, chainbreak [, unknown ]]
+    ARGUMENTS
+        selection : str
+            Atom selection.
+        chainbreak : str, default = '/'
+            Symbol to mark chain breaks.
+        unknown : str, default = '?'
+            Symbol for unknown residues.
+    RETURNS
+        : str
+            One-letter sequence of selection.
+    SOURCE
+        From PSICO (c) 2010-2012 Thomas Holder, MPI for Developmental Biology
     """
     # See: https://github.com/speleo3/pymol-psico/blob/master/psico/modelling.py#L427
     from . import one_letter
@@ -195,25 +250,32 @@ def get_seq(selection, chainbreak="/", unknown="X", quiet=1, *, _self=cmd):
                 if resn in one_letter:
                     yield one_letter[resn]
                 else:
-                    print(f"Warning: unknown residue '{resn}'")
+                    print(f"Warning: Unknown residue {resn!r}")
                     yield unknown
                 prev_resv = resv
     
     seq = seqbuilder()
 
-    if not quiet:
+    if not int(quiet):
         print("get_seq:", "".join(seq))
 
     return "".join(seq)
 
 
 @cmd.extend
-def get_ss(selection="all", chainbreak="/", unknown="-",  *, quiet=1, _self=cmd):
+def get_ss(selection="all", chainbreak="/", unknown="?",  *, quiet=1, _self=cmd):
     """
     DESCRIPTION
-        Get secondary structure of selection as string  
+        Get secondary structure of selection as string.
     USAGE
         get_ss [ selection [, chainbreak [, unknown ]]]
+    ARGUMENTS
+        selection : str, optional
+            Atom selection.
+        chainbreak : str, default = '/'
+            Symbol to mark chain breaks.
+        unknown : str, default = '?'
+            Symbol for unknown structure element.
     """
     res_list = []
     _self.iterate(
@@ -244,16 +306,24 @@ def get_ss(selection="all", chainbreak="/", unknown="-",  *, quiet=1, _self=cmd)
 def get_dipole(selection="all", state=0, var="formal_charge", vis=1, quiet=1, *, _self=cmd):
     """
     DESCRIPTION
-        Get electric dipole momentum for atoms in selection. For VAR use
-        either 'partial_charge' or 'formal_charge'. 
+        Get electric dipole momentum for atoms in selection. For `var` use
+        either `partial_charge` or `formal_charge`. 
     USAGE
         get_dipole [ selection [, state [, var [, vis ]]]]
     ARGUMENTS
-        selection = str: Atom selection {default: all}
-        state = int: Object state (0 for current state). {default: 0}
-        var = str: Property used for calculation. {default: "formal_charge"}
-        vis = int: Visualize output. {default: 1}
+        selection : str, optional
+            Atom selection.
+        state : int
+            Object state (0 for current state).
+        var : str, default = 'formal_charge'
+            Property used for calculation: `partial_charge` or `formal_charge`
+        vis : int, default = True
+            Visualize output.
+    RETURNS
+        : ndarray
+            Dipole moment vector of size (3,) in Debyes.
     """
+    from pymol import cgo
     state, vis, quiet = int(state), int(vis), int(quiet)
 
     bfact = []
@@ -309,12 +379,17 @@ def get_dipole(selection="all", state=0, var="formal_charge", vis=1, quiet=1, *,
 def density(selection="all", state=0, *, quiet=1, _self=cmd):
     """
     DESCRIPTION
-        Calculate density of current state
+        Calculate density of current state. Useful for simulations.
     USAGE
        density [ selection [, state ]]
     ARGUMENTS
-        selection = str: Atom selection {default: all}
-        state = int: Object state (0 for current state). {default: 0}
+        selection : str, optional
+            Atom selection {default: all}
+        state : int, default = 0
+            Object state (0 for current state).
+    RETURNS
+        : float
+            Density in :math:`kg/m^3`.
     """
     if not state:
         state = _self.get_state()
@@ -336,28 +411,34 @@ def density(selection="all", state=0, *, quiet=1, _self=cmd):
 
 
 @cmd.extend
-def rgyro(selection="all", state=0, vis=1, *, quiet=1, _self=cmd):
+def rgyro(selection="all", state=0, vis=True, *, quiet=1, _self=cmd):
     """
     DESCRIPTION
-        ...
+        Calculate radius of gyration for selection.
     USAGE
         rgyro [ selection [, state [, vis ]]]
     ARGUMENTS
-        selection = str: Atom selection {default: all}
-        state = int: Object state (0 for current state). {default: 0}
-        vis = int: Visualize output. {default: 1}
+        selection : str, optional
+            Atom selection.
+        state : int, default = 0
+            Object state (0 for current state).
+        vis : bool, default = True
+            Visualize output.
+    RETURNS
+        : ndarray
+            Radius of gyration vector of size (3,) in Angstroms.
     """
     state, vis, quiet = int(state), int(vis), int(quiet)
 
-    model = cmd.get_model(selection, state).atom
+    model = _self.get_model(selection, state).atom
     xyz = np.array([i.coord for i in model])
     mass = np.array([i.get_mass() for i in model])
-    com = cmd.centerofmass(selection, state)    
+    com = _self.centerofmass(selection, state)
 
     r2 = np.sum((xyz - com) ** 2, axis=1)
     rog = np.sqrt(np.sum(mass * r2) / np.sum(mass))
 
-    if not quiet:
+    if not int(quiet):
         print(
             " Util: radius_of_gyration =",
             np.array2string(rog, precision=3), "Å"
@@ -365,20 +446,28 @@ def rgyro(selection="all", state=0, vis=1, *, quiet=1, _self=cmd):
 
     if vis:
         object = "rog"
-        cmd.pseudoatom(object, pos=com, state=state, vdw=rog)
-        cmd.show("spheres", object)
-        cmd.set("sphere_transparency", 0.5, object)
+        _self.pseudoatom(object, pos=com, state=state, vdw=rog)
+        _self.show("spheres", object)
+        _self.set("sphere_transparency", 0.5, object)
 
     return rog
 
 
 @cmd.extend
-def get_longest_distance(selection="(all)", vis=1, *, _self=cmd):
+def get_longest_distance(selection="(all)", vis=True, *, _self=cmd):
     """
     DESCRIPTION
         Get longest distance in a selection.
     USAGE
         get_longest_distance [ selection [, vis ]]
+    ARGUMENTS
+        selection : str, optional
+            Atom selection.
+        vis : bool, default = True
+            Visualize output.
+    RETURNS
+        : ndarray
+            Distance vector of size (3,) in Angstroms.
     """
     from scipy import spatial
 
@@ -408,42 +497,50 @@ def get_longest_distance(selection="(all)", vis=1, *, _self=cmd):
 
 
 @cmd.extend
-def get_raw_distances(names='', state=1, selection='all', quiet=1, *, _self=cmd):
+def get_raw_distances(names='', state=0, selection='all', quiet=1, *, _self=cmd):
     """
     DESCRIPTION
         Get the list of pair items from distance objects. Each list item is a
         tuple of (index1, index2, distance).
         Based on a script from Takanori Nakane, posted on pymol-users mailing list:
         http://www.mail-archive.com/pymol-users@lists.sourceforge.net/msg10143.html
+    USAGE
+        get_raw_distances [ names [, state [, selection ]]]
     ARGUMENTS
-        names = string: names of distance objects (no wildcards!) {default: all measurement objects}
-        state = integer: object state {default: 1}
-        selection = string: atom selection {default: all}
-    SEE ALSO
+        names : str, optional
+            Names of distance objects (no wildcards!). Defaults to all measurement objects.
+        state : int
+            Object state (0 for current state).
+        selection : str, default = 'all'
+            Atom selection.
+    RETURNS
+        : List
+            A list of pair items from distance objects. Each list item is a
+            tuple of indices pair and distance in Angstroms.
+    SEE ALSO  
         select_distances, cmd.find_pairs, cmd.get_raw_alignment
     """
     from pymol.chempy import cpv
 
-    state, quiet = int(state), int(quiet)
+    state = int(state)
     if state < 1:
         state = _self.get_state()
 
-    valid_names = _self.get_names_of_type('object:measurement')
-    if names == '':
-        names = ' '.join(valid_names)
+    valid_names = _self.get_names_of_type("object:measurement")
+    if names == "":
+        names = " ".join(valid_names)
     else:
         for name in names.split():
             if name not in valid_names:
-                print(' Error: no such distance object: ' + name)
-                raise CmdException
+                raise CmdException(f"No such distance object: {name!r}")
 
-    raw_objects = _self.get_session(names, 1, 1, 0, 0)['names']
+    raw_objects = _self.get_session(names, 1, 1, 0, 0)["names"]
 
     xyz2idx = {}
     _self.iterate_state(
         state,
         selection,
-        'xyz2idx[x,y,z] = (model,index)',
+        "xyz2idx[x,y,z] = (model,index)",
         space=locals()
     )
 
@@ -453,7 +550,7 @@ def get_raw_distances(names='', state=1, selection='all', quiet=1, *, _self=cmd)
             points = obj[5][2][state - 1][1]
             if points is None:
                 raise ValueError
-        except (KeyError, ValueError):
+        except (IndexError, KeyError, ValueError):
             continue
         for i in range(0, len(points), 6):
             xyz1 = tuple(points[i:i + 3])
@@ -466,16 +563,17 @@ def get_raw_distances(names='', state=1, selection='all', quiet=1, *, _self=cmd)
                         cpv.distance(xyz1, xyz2)
                     )
                 )
-                if not quiet:
-                    print(' get_raw_distances: ' + str(r[-1]))
+                if not int(quiet):
+                    print(f" get_raw_distances: {str(r[-1])}")
             except KeyError:
-                if quiet < 0:
-                    print(' Debug: no index for %s %s' % (xyz1, xyz2))
+                if int(quiet) < 0:
+                    print(f"Debug: no index for: {xyz1}, {xyz2}")
     return r
 
 
 @cmd.extend
-def get_contacts(selection1, selection2, name="contacts", cutoff = [3.6, 4.0, 4.8], state=0, *, _self=cmd):
+def get_contacts(selection1, selection2, name="contacts", state=0, 
+                 hb_cutoff=3.6, sb_cutoff=4.0, pi_cutoff=4.8, *, _self=cmd):
     """
     DESCRIPTION
         Returns the average number of each contacts between two selections (the good, the bad,
@@ -483,31 +581,37 @@ def get_contacts(selection1, selection2, name="contacts", cutoff = [3.6, 4.0, 4.
     USAGE
         get_contacts selection1, selection2 [ name [, cutoff [, state ]]]
     ARGUMENTS
-        selection1, selection2 = str: Atom selection
-        name = str: Name of output group {default: "contacts"}
-        cutoff = list: Cutoff distance for each type of interaction {default: [3.6, 4.0, 4.8]}
-        state = int: Object state {default: 0 (all states)}
-    NOTES
-        pi-pi interactions for identical selections not working properly.
-    PYTHON API
-        cmd.show_contacts(...) -> list
+        selection1, selection2 : str
+            Atom selections.
+        name : str, default = 'contacts'
+            Name of output group.
+        state : int, default = 0
+            Object state (0 for all states).
+        hb_cutoff : float, default = 3.6
+            Cutoff distance for hydrogen bonds in Angstroms.
+        sb_cutoff : float, default = 4.0
+            Cutoff distance for salt bridges in Angstroms.
+        pi_cutoff : float, default = 3.6
+            Cutoff distance for pi-cation and pi-pi interactions in Angstroms.
+    RETURNS
+        : List[float]
+            Average number of each type of interactions: hydrogen bonds, 
+            salt bridges, pi-cation, and pi-pi.
     SEE ALSO
-        get_raw_distances
+        :func:`get_raw_distances`
     """
     state = int(state)
 
     # Check for empty selections
     if not _self.get_object_list(selection1):
-        raise CmdException(f"Empty selection: {selection1}")
+        raise CmdException(f"Empty selection: {selection1!r}")
     if not _self.get_object_list(selection2):
-        raise CmdException(f"Empty selection: {selection2}")
+        raise CmdException(f"Empty selection: {selection2!r}")
 
     # Generate new empty group
     name = _self.get_legal_name(name)
     _self.delete(name)
     _self.group(name)
-
-    result = [0, 0, 0, 0]
 
     def get_aromatic(selection, name):
         """ Generate aromatic centers as pseudo-atoms """
@@ -540,11 +644,11 @@ def get_contacts(selection1, selection2, name="contacts", cutoff = [3.6, 4.0, 4.
             "hbond",
             f"{selection1} & (donor|acceptor)",
             f"{selection2} & (donor|acceptor)",
-            cutoff=cutoff[0],
+            cutoff=hb_cutoff,
             mode=2,
             state=state,
         )
-        result[0] = len(get_raw_distances("hbond", state))
+        num_hb = len(get_raw_distances("hbond", state))
         _self.set("dash_color", "yellow", "hbond")
         _self.group(name, "hbond")
 
@@ -554,11 +658,11 @@ def get_contacts(selection1, selection2, name="contacts", cutoff = [3.6, 4.0, 4.
             "salt_bridge",
             f"{selection1} & (fc. < 0 | fc. > 0)",
             f"{selection2} & (fc. < 0 | fc. > 0)",
-            cutoff=cutoff[1],
+            cutoff=sb_cutoff,
             mode=0,
             state=state,
         )
-        result[1] = len(get_raw_distances("salt_bridge", state))
+        num_sb = len(get_raw_distances("salt_bridge", state))
         _self.set("dash_color", "red", "salt_bridge")
         _self.group(name, "salt_bridge")
 
@@ -568,7 +672,7 @@ def get_contacts(selection1, selection2, name="contacts", cutoff = [3.6, 4.0, 4.
             f"pi-cation",
             f"{selection1} & fc. > 0",
             "?aromatic2",
-            cutoff=cutoff[1],
+            cutoff=pi_cutoff,
             mode=0,
             state=state,
         )
@@ -576,11 +680,11 @@ def get_contacts(selection1, selection2, name="contacts", cutoff = [3.6, 4.0, 4.
             f"pi-cation",
             "?aromatic1",
             f"{selection2} & fc. > 0",
-            cutoff=cutoff[1],
+            cutoff=pi_cutoff,
             mode=0,
             state=state,
         )
-        result[2] = len(get_raw_distances("pi-cation", state))
+        num_pi_cat = len(get_raw_distances("pi-cation", state))
         _self.set("dash_color", "purple", "pi-cation")
         _self.group(name, "pi-cation")
 
@@ -590,11 +694,11 @@ def get_contacts(selection1, selection2, name="contacts", cutoff = [3.6, 4.0, 4.
             "pi-pi",
             "?aromatic1",
             "?aromatic2",
-            cutoff=cutoff[2],
+            cutoff=pi_cutoff,
             mode=0,
             state=state,
         )
-        result[3] = len(get_raw_distances("pi-pi", state))
+        num_pi_pi = len(get_raw_distances("pi-pi", state))
         _self.set("dash_color", "gray", "pi-pi")
         _self.group(name, "pi-pi")
 
@@ -603,6 +707,7 @@ def get_contacts(selection1, selection2, name="contacts", cutoff = [3.6, 4.0, 4.
         _self.delete("aromatic2")
 
     # Normalize to number of frames
+    result = [num_hb, num_sb, num_pi_cat, num_pi_pi]
     if not state:
         num_states = _self.count_states()
         result = [r / num_states for r in result]

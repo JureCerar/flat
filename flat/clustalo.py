@@ -13,6 +13,39 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""
+:mod:`flat.clustalo`
+====================
+Module of multiple sequence alignment using `Clustal Omega`_
+
+Installation
+------------
+Clustal can be installed with multiple methods
+
+1. Linux (Recommended)
+    Open your terminal and run:
+
+    .. code:: bash
+
+        apt install clustalo
+
+    .. note::
+
+        The package name may vary depending on your Linux distribution.
+
+2.  Conda/Bioconda
+    If you have Conda or Mamba installed, run:
+
+    .. code:: bash
+
+        conda install clustalo -c bioconda
+        # OR
+        conda install bioconda::clustalo
+
+.. _Clustal Omega:
+    https://www.ebi.ac.uk/jdispatcher/msa/clustalo
+"""
+
 from pymol import cmd
 import tempfile
 import subprocess 
@@ -22,21 +55,19 @@ _CLUSTAL_FMT = ["a2m", "fasta", "clustal", "msf", "phylip", "selex", "stockholm"
 
 
 @cmd.extend
-def clustalo(selection="all", fmt="clustal", exe="clustalo", *, _self=cmd):
+def clustalo(selection="all", fmt="clustal",  *, exe="clustalo", _self=cmd):
     """
     DESCRIPTION
-        Multiple sequence alignment with Clustal O
+        Multiple sequence alignment with Clustal Omega.
     USAGE
-        clustalo [ selection [, fmt [, exe ]]]
+        clustalo [ selection [, fmt ]]
     ARGUMENTS
-        selection = str: Atom selection. {default: all}
-        fmt = str: Output format. {default: clustal}
-        exe = str: Path to CLUSTALO executable. {default: }
+        selection : str, optional
+            Atom selection.
+        fmt : str, default = 'clustal'
+            Output format.
     """
-    # TODO:
-    # - [ ] Add result visualization
-
-    # Find and validate CLUSTALO executable
+    # Find and validate executable
     if exe:
         exe = _self.exp_path(exe)
     else:
@@ -51,8 +82,6 @@ def clustalo(selection="all", fmt="clustal", exe="clustalo", *, _self=cmd):
         
     for line in proc.stdout.splitlines():
         print(line)
-
-    return
 
 
 # Autocomplete

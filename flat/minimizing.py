@@ -13,11 +13,17 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""
+:mod:`flat.minimizing`
+======================
+Module for relaxing andminimizing molecular objects.
+"""
+
 from pymol import cmd, CmdException
 import io
 
 
-def get_fixed_indices(selection, state, _self):
+def _get_fixed_indices(selection, state, _self):
     """Fix pymol idices"""
     fixed_list = []
     _self.iterate_state(
@@ -29,7 +35,7 @@ def get_fixed_indices(selection, state, _self):
     return [idx for (idx, fixed) in enumerate(fixed_list) if fixed]
 
 
-def load_or_update(molstr, name, fmt, sele, state, _self):
+def _load_or_update(molstr, name, fmt, sele, state, _self):
     """Load or update structure of existing object"""
     with _self.lockcm:
         update = not name
@@ -47,17 +53,20 @@ def load_or_update(molstr, name, fmt, sele, state, _self):
             _self.delete(name)
 
 
-def randomize_coords_if_collapsed(selection, state, fancy=True, _self=cmd):
+def randomize_coords_if_collapsed(selection, state=-1, fancy=True, _self=cmd):
     """
     DESCRIPTION
         If all coordinates are the same (collapsed into one point), then
         randomize them.
     USAGE
-        randomize_coords_if_collapsed [ selection [, state [, fancy ]]]
+        randomize_coords_if_collapsed selection [, state [, fancy ]]
     ARGUMENTS
-        selection = str: atom selection
-        state = int: object state {default: -1}
-        fancy = bool: Arrange atoms in a circle (this works better for openbabel)
+        selection : str
+            Atom selection.
+        state : int, default = -1
+            Object state.
+        fancy : bool, default = True
+            Arrange atoms in a circle (this works better for openbabel).
     SOURCE
         From PSICO (c) Thomas Holder, Schrodinger Inc.
     """
@@ -83,17 +92,21 @@ def randomize_coords_if_collapsed(selection, state, fancy=True, _self=cmd):
 @cmd.extend
 def minimize_ob(selection="enabled", state=-1, ff="UFF", nsteps=500,
                 conv=0.0001, cutoff=0, cut_vdw=6.0, cut_elec=8.0,
-                name="", quiet=1, _self=cmd):
+                name="", quiet=1, *, _self=cmd):
     """
     DESCRIPTION
-        Energy minimization with OpenBabel. Supports fixed atoms (flag fix)
+        Energy minimization with OpenBabel. Supports fixed atoms (flag fix).
     USAGE
-        minimize_ob [selection [, state [, ff [, nsteps [, ... ]]]]] 
+        minimize_ob [ selection [, state [, ff [, nsteps [, ... ]]]]] 
     ARGUMENTS
-        selection = str: atom selection
-        state = int: object state {default: -1}
-        ff = GAFF|MMFF94s|MMFF94|UFF|Ghemical: force field {default: UFF}
-        nsteps = int: number of steps {default: 500}
+        selection : str
+            Atom selection.
+        state : int, default = -1
+            Object state.
+        ff : str, default = 'UFF'
+            Force-field: `GAFF`, `MMFF94s`, `MMFF94`, `UFF`, `Ghemical`
+        nsteps : int, default = 500
+            Number of minimization steps.
     SOURCE
         From PSICO (c) Thomas Holder, Schrodinger Inc.
     """
@@ -129,7 +142,7 @@ def minimize_ob(selection="enabled", state=-1, ff="UFF", nsteps=500,
         consttrains.Setup(mol)
 
         # atoms with "flag fix"
-        fixed_indices = get_fixed_indices(sele, state, _self)
+        fixed_indices = _get_fixed_indices(sele, state, _self)
         for idx in fixed_indices:
             consttrains.AddAtomConstraint(idx + 1)
 
@@ -155,7 +168,7 @@ def minimize_ob(selection="enabled", state=-1, ff="UFF", nsteps=500,
             mol.DeleteAtom(mol.GetAtomById(hydro_id))
 
         molstr = obconversion.WriteString(mol)
-        load_or_update(molstr, name, "mol", sele, state, _self)
+        _load_or_update(molstr, name, "mol", sele, state, _self)
 
         if not int(quiet):
             print(" Energy: %8.2f %s" % (ff.Energy(), ff.GetUnit()))
@@ -165,17 +178,21 @@ def minimize_ob(selection="enabled", state=-1, ff="UFF", nsteps=500,
 
 @cmd.extend
 def minimize_rdkit(selection="enabled", state=-1, ff="MMFF94", nsteps=500,
-                   name="", quiet=1, _self=cmd):
+                   name="", quiet=1, *, _self=cmd):
     """
     DESCRIPTION
         Energy minimization with RDKit. Supports fixed atoms (flag fix)
     USAGE
-        minimize_ob [selection [, state [, ff [, nsteps [, ... ]]]]] 
+        minimize_rdkit [ selection [, state [, ff [, nsteps [, ... ]]]]]
     ARGUMENTS
-        selection = str: atom selection
-        state = int: object state {default: -1}
-        ff = MMFF94s|MMFF94|UFF: force field {default: MMFF94}
-        nsteps = int: number of steps {default: 200}
+        selection : str
+            Atom selection.
+        state : int, default = -1
+            Object state.
+        ff : str, default = 'MMFF94'
+            Force-field: `MMFF94s`, `MMFF94`, `UFF`
+        nsteps : int, default = 500
+            Number of minimization steps.
     SOURCE
         From PSICO (c) Thomas Holder, Schrodinger Inc.
     """
@@ -215,7 +232,7 @@ def minimize_rdkit(selection="enabled", state=-1, ff="MMFF94", nsteps=500,
             raise CmdException("forcefield setup failed")
 
         # atoms with "flag fix"
-        for idx in get_fixed_indices(sele, state, _self):
+        for idx in _get_fixed_indices(sele, state, _self):
             ff.AddFixedPoint(idx)
 
         # run minimization
@@ -223,7 +240,7 @@ def minimize_rdkit(selection="enabled", state=-1, ff="MMFF94", nsteps=500,
             print(" Warning: minimization did not converge")
 
         molstr = Chem.MolToMolBlock(mol)
-        load_or_update(molstr, name, "mol", sele, state, _self)
+        _load_or_update(molstr, name, "mol", sele, state, _self)
 
         if not int(quiet):
             print(" Energy: %8.2f %s" % (ff.CalcEnergy(), "kcal/mol"))
@@ -233,17 +250,21 @@ def minimize_rdkit(selection="enabled", state=-1, ff="MMFF94", nsteps=500,
 
 @cmd.extend
 def minimize_mm(selection="enabled", state=-1, ff="amber14-all.xml", nsteps=500,
-                   name="", quiet=1, _self=cmd):
+                name="", quiet=1, *, _self=cmd):
     """
     DESCRIPTION
-        Energy minimization with OpenMM. Supports fixed atoms (flag fix)
+        Energy minimization with OpenMM. Supports fixed atoms (flag fix).
     USAGE
-        minimize [selection [, state [, ff [, nsteps [, ... ]]]]] 
+        minimize_mm [ selection [, state [, ff [, nsteps [, ... ]]]]] 
     ARGUMENTS
-        selection = str: atom selection {default: enabled}
-        state = int: object state {default: -1}
-        ff = str: OpenMM force field {default: amber14-all.xml}
-        nsteps = int: number of steps {default: 200}
+        selection : str, optional
+            Atom selection.
+        state : int, default = -1
+            Object state.
+        ff : str, default = 'amber14-all.xml'
+            Force-field.
+        nsteps : int, default = 500
+            Number of minimization steps.
     """
     import openmm
     import openmm.app
@@ -288,7 +309,7 @@ def minimize_mm(selection="enabled", state=-1, ff="amber14-all.xml", nsteps=500,
         final = simulation.context.getState(getPositions=True, getEnergy=True)
         with io.StringIO() as f:
             openmm.app.PDBFile.writeFile(simulation.topology, final.getPositions(), f)
-            load_or_update(f.getvalue(), name, "pdb", sele, state, _self)
+            _load_or_update(f.getvalue(), name, "pdb", sele, state, _self)
 
         if not int(quiet):
             print(f" Energy: {final.getPotentialEnergy()}")

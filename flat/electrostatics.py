@@ -13,23 +13,35 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""
+:mod:`flat.electrostatics`
+==========================
+Module for computing electrostatic properties.
+"""
+
 from pymol import cmd
 
 
 @cmd.extend
-def sum_formal_charges(selection="(all)", quiet=1, *, _self=cmd):
+def sum_formal_charges(selection="all", quiet=1, *, _self=cmd):
     """
     DESCRIPTION
-        Get sum of formal charges for selection
+        Get sum of formal charges for selection.
     USAGE
-        sum_formal_charges [selection [, quiet ]]
+        sum_formal_charges [ selection ]
+    ARGUMENTS
+        selection : str, optional
+            Atom selection.
+    RETURNS
+        : int
+            Sum of formal charges.
     """
     _util_sum_fc = [0]
     _self.iterate(
         selection, "_util_sum_fc[0] += formal_charge", space=locals())
     sum_formal_charges = _util_sum_fc[0]
     if not int(quiet):
-        print(f" Util: {sum_formal_charges = }")
+        print(f" Util: {sum_formal_charges=}")
     return sum_formal_charges
 
 
@@ -39,14 +51,20 @@ def sum_partial_charges(selection="(all)", quiet=1, *, _self=cmd):
     DESCRIPTION
         Get sum of partial charges for selection
     USAGE
-        sum_partial_charges [selection [, quiet ]]
+        sum_partial_charges [ selection ]
+    ARGUMENTS
+        selection : str, optional
+            Atom selection.
+    RETURNS
+        : float
+            Sum of partial charges.
     """
     _util_sum_pc = [0.0]
     _self.iterate(
         selection, "_util_sum_pc[0] += partial_charge", space=locals())
     sum_partial_charges = _util_sum_pc[0]
     if not int(quiet):
-        print(f" Util: {sum_partial_charges = }")
+        print(f" Util: {sum_partial_charges=}")
     return sum_partial_charges
 
 
@@ -54,11 +72,14 @@ def sum_partial_charges(selection="(all)", quiet=1, *, _self=cmd):
 def set_charges_and_radii(obj_name, quiet=1, *, _self=cmd):
     """
     DESCRIPTION
-        Assign atom VdW radii, formal, and partial charges using AMBER99 force-field.
+        Assign atom VdW radii, formal, and partial charges using
+        AMBER99 force-field. Function has it's own fair share of problems.
+        Use with caution!
     USAGE
-        set_charges_and_radii obj_name [, quiet ]
-    NOTES
-        Function has it's own fair share of problems. Use with caution!
+        set_charges_and_radii obj_name
+    ARGUMENTS
+        obj_name : str
+            Molecular object name.
     """
     from pymol.chempy.champ import assign
 
@@ -85,7 +106,7 @@ def set_charges_and_radii(obj_name, quiet=1, *, _self=cmd):
 
     while not assign.formal_charges(obj_name, quiet=1, _self=_self):
         print(" WARNING: unrecognized or incomplete residues are being deleted:")
-        _self.iterate("(byres ("+obj_name+" and flag 23)) and flag 31",
+        _self.iterate("(byres (" + obj_name + " and flag 23)) and flag 31",
                     'print("  "+model+"/"+segi+"/"+chain+"/"+resn+"`"+resi+"/")', quiet=1)
         # Get rid of residues that weren't assigned
         _self.remove("byres ("+obj_name+" and flag 23)")
@@ -113,65 +134,73 @@ def set_charges_and_radii(obj_name, quiet=1, *, _self=cmd):
 def get_vacuum_esp(selection, mode=2, cutoff=10.0, *, _self=cmd):
     """
     DESCRIPTION
-        Calculate vacuum  potential map.
+        Calculate vacuum electrostatic potential map.
+
+        Available calculation modes:
+
+        * 0: coulomb, no cutoff
+        * 1: coulomb_neutral map, no cutoff
+        * 2: coulomb_local, cutoff
+
     USAGE
-        get_vacuum_esp selection [, mode [, border [, quiet ]]]
+        get_vacuum_esp selection [, mode [, border ]]
     ARGUMENTS
-        selection = str: Atom selection.
-        mode = int: Calculation mode: {default: 2}
-            0: coulomb, no cutoff
-            1: coulomb_neutral map, no cutoff
-            2: coulomb_local, cutoff
-        cutoff = float: Calculation cutoff value {default: 10.0}
+        selection : str, optional
+            Atom selection.
+        mode = int, default = 2
+            Calculation mode (see above).
+        cutoff : float, default = 10.0
+            Calculation cutoff value.
     SOURCE
         From PSICO (c) 2012 Thomas Holder
     """
     if (selection.split() != [selection] or
-            selection not in cmd.get_names('objects')):
+            selection not in _self.get_names("objects")):
         print(" Error: must provide an object name")
-        raise cmd.QuietException
+        raise _self.QuietException
     
     obj_name = selection + "_e_chg"
     map_name = selection + "_e_map"
     pot_name = selection + "_e_pot"
-    cmd.disable(selection)
-    cmd.delete(obj_name)
-    cmd.delete(map_name)
-    cmd.delete(pot_name)
-    cmd.create(obj_name, "((polymer and ("+selection +
+    _self.disable(selection)
+    _self.delete(obj_name)
+    _self.delete(map_name)
+    _self.delete(pot_name)
+    _self.create(obj_name, "((polymer and (" + selection +
         ") and (not resn A+C+T+G+U)) or ((bymol (polymer and (" +
-        selection+"))) and resn NME+NHE+ACE)) and (not hydro)"
+        selection + "))) and resn NME+NHE+ACE)) and (not hydro)"
     )
     
     # try to just get protein...
     set_charges_and_radii(obj_name, _self=_self)
 
-    ext = cmd.get_extent(obj_name)
+    ext = _self.get_extent(obj_name)
     max_length = max(
         abs(ext[0][0] - ext[1][0]),
         abs(ext[0][1] - ext[1][1]),
         abs(ext[0][2] - ext[1][2])
     ) + 2 * cutoff
 
-    # compute an grid with a maximum dimension of 50, with 10 A borders around molecule, and a 1.0 A minimum grid
+    # compute an grid with a maximum dimension of 50, with 10 A
+    # borders around molecule, and a 1.0 A minimum grid
     sep = max_length/50.0
     if sep < 1.0:
         sep = 1.0
 
     print(" Util: Calculating electrostatic potential...")
     if mode == 0:  # absolute, no cutoff
-        cmd.map_new(map_name, "coulomb", sep, obj_name, cutoff)
+        _self.map_new(map_name, "coulomb", sep, obj_name, cutoff)
     elif mode == 1:  # neutral, no cutoff
-        cmd.map_new(map_name, "coulomb_neutral", sep, obj_name, cutoff)
+        _self.map_new(map_name, "coulomb_neutral", sep, obj_name, cutoff)
     else:  # local, with cutoff
-        cmd.map_new(map_name, "coulomb_local", sep, obj_name, cutoff)
+        _self.map_new(map_name, "coulomb_local", sep, obj_name, cutoff)
 
     # Visualize result
-    cmd.ramp_new(pot_name, map_name, selection=obj_name, zero=1)
-    cmd.hide("everything", obj_name)
-    cmd.show("surface", obj_name)
-    cmd.set("surface_color", pot_name, obj_name)
-    cmd.set("surface_ramp_above_mode", 1, obj_name)
+    _self.ramp_new(pot_name, map_name, selection=obj_name, zero=1)
+    _self.hide("everything", obj_name)
+    _self.show("surface", obj_name)
+    _self.set("surface_color", pot_name, obj_name)
+    _self.set("surface_ramp_above_mode", 1, obj_name)
 
 
 # Autocomplete

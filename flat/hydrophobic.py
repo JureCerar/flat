@@ -13,12 +13,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""
+:mod:`flat.hydrophobic`
+=======================
+Module for computing hydrophobic properties.
+"""
+
 from pymol import cmd, CmdException, cgo
 import collections
 import numpy as np
 
 
-_hydro_moment = {
+_HYDRO_MOMENT = {
     # D. Bandyopadhyay, E.L. Mehler, Proteins, 2007, 72(2), 646–659. doi:10.1002/prot.21958 
     "bandyopadhyay-methler": {
         "CYS":  1.15, "ILE":  0.97, "LEU":  0.87, "PHE":  0.85, "VAL":  0.83,
@@ -95,50 +101,54 @@ _hydro_moment = {
 
 
 @cmd.extend
-def hydropathy(selection="(all)", method="Black-Mould", vis=1, *, _self=cmd):
+def hydropathy(selection="all", method="Black-Mould", vis=True, *, _self=cmd):
     """
     DESCRIPTION
         Assign hydrophobicity to amino-acid residues in selection.
     USAGE
         hydropathy [ selection [, method [, vis ]]]
     ARGUMENTS
-        selection = str: Atom selection. {default: all}
-        method = str: Hydrophobic scale. {default: 'Black-Mould'}
-        vis = bool: Visualize results {default: True}
+        selection : str, optional
+            Atom selection.
+        method : str, default = 'Black-Mould'
+            Hydrophobic scale.
+        vis : bool, default = True
+            Visualize results.
     """
-    vis = int(vis)
-
-    if not method.lower() in _hydro_moment:
-        raise CmdException(f"Unknown method: '{method}'")
+    if not method.lower() in _HYDRO_MOMENT:
+        raise CmdException(f"Unknown method: {method!r}")
     
-    hpi = _hydro_moment.get(method.lower())
+    hpi = _HYDRO_MOMENT.get(method.lower())
     _self.alter(selection, "b = hpi.get(resn, 0.0)", space=locals())
 
-    if vis:
+    if int(vis):
         palette = ["tv_green", "white", "orange"]
         obj = _self.get_object_list(selection)[0]
         vmin, vmax = min(hpi.values()), max(hpi.values())
         _self.spectrum("b", " ".join(palette), selection, minimum=vmin, maximum=vmax)
         _self.ramp_new("hydrophobicity", obj, [vmin, vmax], palette)
 
-    return
-
 
 @cmd.extend
-def hydropathy_moment(selection="(all)", method="Black-Mould", state=1, vis=1, *, quiet=1, _self=cmd):
+def hydropathy_moment(selection="all", method="Black-Mould", state=1, vis=True, *, quiet=1, _self=cmd):
     """
     DESCRIPTION
         Get first-order hydrophobic moment vector for selection.
     USAGE
         hydropathy_moment [ selection [, method [, state [, vis ]]]]
     ARGUMENTS
-        selection = str: Atom selection. {default: all}
-        method = str: Hydrophobic scale. {default: 'Black-Mould'}
-        vis = bool: Visualize result {default: True}
-    LITERATURE
+        selection : str, optional
+            Atom selection.
+        method : str, default = 'Black-Mould'
+            Hydrophobic scale.
+        state : int, default = 0
+            Object state. 0 for current state.
+        vis : bool, default = True
+            Visualize results.
+    REFERENCE
         B.D. Silverman, PNAS, 2001, 98(9), 4996-5001. doi:10.1073/pnas.081086198
     """
-    vis, state, quiet = int(vis), int(state), int(quiet)
+    state = int(state), 
 
     if len(_self.get_object_list(selection)) != 1:
         raise CmdException("Multiple object in selection.")
@@ -150,16 +160,15 @@ def hydropathy_moment(selection="(all)", method="Black-Mould", state=1, vis=1, *
     n_residues = len(residues)
 
     # Get dictionary of hydrophobic indices
-    if not method.lower() in _hydro_moment:
+    if not method.lower() in _HYDRO_MOMENT:
         raise CmdException(f"Unknown method: '{method}'")
-    hydro_dict = _hydro_moment.get(method.lower()).copy()
+    hydro_dict = _HYDRO_MOMENT.get(method.lower()).copy()
 
     # Assign hydrophobic index
     hydro = list()
     for segi, chain, resn, resi in residues:
         if resn not in hydro_dict.keys():
-            print(
-                f"Warning: Cannot assign hydrophobic index to residue: '{resn}'")
+            print(f"Warning: Cannot assign hydrophobic index to residue: {resn!r}")
         # Default hydrophobicity value is zero?
         hydro.append(hydro_dict.get(resn, 0.0))
     hydro = np.array(hydro)
@@ -194,14 +203,14 @@ def hydropathy_moment(selection="(all)", method="Black-Mould", state=1, vis=1, *
     for i in range(n_residues):
         hydro_moment += hydro[i] * sasa[i] * (xyz[i] - com)
 
-    if not quiet:
+    if not int(quiet):
         print(
             " Util: hydro_moment =",
             f"{np.linalg.norm(hydro_moment):.3f}",
             np.array2string(hydro_moment, precision=2)
         )
 
-    if vis:
+    if int(vis):
         color1 = _self.get_color_tuple("green")
         color2 = _self.get_color_tuple("orange")
 
@@ -234,6 +243,6 @@ cmd.auto_arg[0].update({
     "hydropathy_moment": cmd.auto_arg[0]["zoom"],
 })
 cmd.auto_arg[1].update({
-    "hydropathy": [cmd.Shortcut(_hydro_moment.keys()), "method", ""],
-    "hydropathy_moment": [cmd.Shortcut(_hydro_moment.keys()), "method", ""],
+    "hydropathy": [cmd.Shortcut(_HYDRO_MOMENT.keys()), "method", ""],
+    "hydropathy_moment": [cmd.Shortcut(_HYDRO_MOMENT.keys()), "method", ""],
 })

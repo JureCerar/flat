@@ -13,6 +13,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""
+:mod:`flat.modelling`
+=====================
+Module for modelling molecular objects.
+"""
+
 from pymol import cmd, CmdException
 import numpy as np
 import collections
@@ -21,12 +27,23 @@ from . import three_letter
 
 
 @cmd.extend
-def relax(selection, backbone=1, neighbors=1, cycles=100, state=0, *, _self=cmd):
+def relax(selection, backbone=True, neighbors=True, cycles=1_000, state=0, *, _self=cmd):
     """
     DESCRIPTION
         Relax the given selection using sculpting wizard.
     USAGE
         relax selection [, backbone [, neighbors [, cycles [, state ]]]]
+    ARGUMENTS
+        selection : str
+            Atom selection.
+        backbone : bool, default = True
+            Include backbone in sculpting (opposed to side-chains only).
+        neighbors : bool, default = True
+            Include atoms near (6 Angstroms) to selection in sculpting.
+        cycles : int, default = 1000
+            Number of sculpting cycles.
+        state : int, default = 0
+            Object state.
     """
     backbone, neighbors,  = int(backbone), int(neighbors)
     cycles, state = int(cycles), int(state)
@@ -56,8 +73,6 @@ def relax(selection, backbone=1, neighbors=1, cycles=100, state=0, *, _self=cmd)
     _self.sculpt_deactivate(obj)
     _self.deprotect()
 
-    return
-
 
 @cmd.extend
 def mutate(selection, name, sculpt=0, cycles=100, *, _self=cmd):
@@ -68,16 +83,19 @@ def mutate(selection, name, sculpt=0, cycles=100, *, _self=cmd):
     USAGE
         mutate selection, name [, sculpt [, cycles ]]
     ARGUMENTS
-        selection = string: atom selection to renumber.
-        name = str: Name of fragment to insert. 
-        sculpt = bool: sculpt inserted residue. {default: 1}
-        cycles: Number of sculpt iterations. {default: 100}
-    """
-    sculpt, cycles = int(sculpt), int(cycles)
-    
+        selection : string
+            atom selection to renumber.
+        name : str
+            Name of fragment to insert. 
+        sculpt : bool, default = False
+            Sculpt inserted residue.
+        cycles : int, default = 100
+            Number of sculpting cycles.
+    SEE ALSO
+        :func:`replace`
+    """    
     if len(_self.get_model(selection).get_residues()) != 1:
         raise CmdException("Multiple residues in selection.")
-
     if len(name) == 1:
         name = three_letter.get(name, name)
 
@@ -98,26 +116,28 @@ def mutate(selection, name, sculpt=0, cycles=100, *, _self=cmd):
     finally:
         _self.set_wizard()
 
-    if sculpt > 0:
-        relax(selection, 1, 1, cycles)
-
-    return
+    if int(sculpt):
+        relax(selection, 1, 1, int(cycles))
 
 
 @cmd.extend
-def replace(selection, name, sculpt=0, cycles=100, *, quiet=1, _self=cmd):
+def replace(selection, name, sculpt=True, cycles=100, *, quiet=1, _self=cmd):
     """
     DESCRIPTION
         Replace target residue with fragment. Use for ONLY for non-standard residues.
     USAGE
         insert selection, name [, sculpt [, cycles ]]
     ARGUMENTS
-        selection = string: atom selection to renumber.
-        name = str: Name of fragment to insert. 
-        sculpt = bool: sculpt inserted residue. {default: 1}
-        cycles: Number of sculpt iterations. {default: 100}
+        selection : str
+            Atom selection.
+        name : str
+            Name of fragment. 
+        sculpt : bool, default = True
+            Sculpt inserted residue.
+        cycles : int, default = 100
+            Number of sculpting cycles.
     SEE ALSO
-        mutate
+        :func:`mutate`
     """
     try:
         from .creating import fragment
@@ -206,18 +226,23 @@ def replace(selection, name, sculpt=0, cycles=100, *, quiet=1, _self=cmd):
 
 
 @cmd.extend
-def add_missing_atoms(selection, sculpt=0, cycles=100, *, _self=cmd):
+def add_missing_atoms(selection, sculpt=False, cycles=100, *, _self=cmd):
     """
     DESCRIPTION
         Mutate those residues to themselves which have missing atoms.
     USAGE
         add_missing_atoms selection [, sculpt [, cycles ]]
+    ARGUMENTS
+        selection : string
+            Atom selection.
+        sculpt : bool, default = False
+            Sculpt inserted residue.
+        cycles : int, default = 100
+            Number of sculpting cycles.
     SOURCE
         From PSICO (c) 2010-2012 Thomas Holder, MPI for Developmental Biology
     """
-    sculpt, cycles = int(sculpt), int(cycles)
-
-    reference = {
+    REFERENCE = {
         "ALA": {"CB"},
         "ARG": {"CB", "CG", "NE", "CZ", "NH1", "NH2", "CD"},
         "ASN": {"CB", "CG", "OD1", "ND2"},
@@ -250,11 +275,11 @@ def add_missing_atoms(selection, sculpt=0, cycles=100, *, _self=cmd):
     sele_list = []
     for key, namelist in namelists.items():
         resn = key[3]
-        if resn not in reference:
-            print(f"Unknown residue: '{resn}'")
+        if resn not in REFERENCE:
+            print(f"Error: Unknown residue: {resn!r}")
             continue
 
-        if not reference[resn].issubset(namelist):
+        if not REFERENCE[resn].issubset(namelist):
             try:
                 _self.wizard("mutagenesis")
                 _self.do("refresh_wizard")
@@ -273,14 +298,14 @@ def add_missing_atoms(selection, sculpt=0, cycles=100, *, _self=cmd):
                 #     print(f"Mutated: {sele}")
 
             except Exception as ex:
-                print(f"Mutating '{sele}' failed: {ex}")
+                print(f"Mutating {sele!r} failed: {ex}")
 
             finally:
                 _self.set_wizard()
 
-    if sculpt:
+    if int(sculpt):
         for sele in sele_list:
-            relax(sele, 0, 0, cycles)
+            relax(sele, 0, 0, int(cycles))
 
     return 
 
@@ -290,14 +315,18 @@ def fix_h(selection="all", *, _self=cmd):
     """
     DESCRIPTION
         Adds hydrogens with correct names onto a molecule using OpenMM based on known templates.
+
+        .. note::
+
+            It's a kludge and may need some love and persuasion to work. This adds hydrogens
+            based on template i.e. it will most likely only work for proteins, sugars, and 
+            DNA/RNA. Also needs to have well defined C- and N-terminus.
+
     USAGE
-        fix_h [selection]
-    PARAMETERS
-        selection = str: atom selection {default: all}
-    NOTES
-        It's a kludge and may need some love and persuasion to work. This adds hydrogens based
-        on template i.e. it will most likely only work for proteins, sugars, and DNA/RNA. Also
-        needs to have well defined C- and N-terminus.  
+        fix_h [ selection ]
+    ARGUMENTS
+        selection : str, optional
+            Atom selection.
     """
     import openmm
     import openmm.app
@@ -334,17 +363,19 @@ def fix_h(selection="all", *, _self=cmd):
 
 
 @cmd.extend
-def update_align(mobile, target, state=1, *, fix="none", quiet=1, _self=cmd):
+def update_align(mobile, target, state=1, fix="none", *, quiet=1, _self=cmd):
     """
     DESCRIPTION
         Update (and optionally fix) coordinates based on sequence alignment.
     USAGE
         update_align mobile, target [, state [, fix ]]
-    PARAMETERS
-        mobile = str: atom selection of mobile section.
-        target = str: atom selection of target section. 
-        state = int: select state. {default: 1}
-        fix = restrain | fix | protect | none: Method for fixing updated atoms
+    ARGUMENTS
+        mobile, target : str
+            Atom selection of mobile and target.
+        state : int, default = 1
+            Select state
+        fix : str, default = 'none'
+            Method for fixing updated atoms: `restrain`, `fix`, `protect`, `none`. 
     SOURCE
         From PSICO (c) 2010-2012 Thomas Holder, MPI for Developmental Biology
     """
@@ -372,18 +403,21 @@ def update_align(mobile, target, state=1, *, fix="none", quiet=1, _self=cmd):
 
 
 @cmd.extend
-def sculpt_homolog(mobile, target, state=1, cycles=1_000, *, fix="restrain", quiet=1, _self=cmd):
+def sculpt_homolog(mobile, target, state=1, cycles=1_000, fix="restrain", *, quiet=1, _self=cmd):
     """
     DESCRIPTION
         Sculpt mobile towards target, based on sequence alignment.
     USAGE 
         sculpt_homolog mobile, target [, state [, cycles [, fix ]]]
     ARGUMENTS
-        mobile = str: atom selection of mobile section.
-        target = str: atom selection of target section. 
-        state = int: select state. {default: 1}
-        cycles: Number of sculpt iterations. {default: 1000}
-        fix = restrain | fix | protect | none: Method for fixing updated atoms
+        mobile, target : str
+            Atom selection of mobile and target.
+        state : int, default = 1
+            Select state
+        cycles : int, default = 1000
+            Number of sculpt iterations.
+        fix : str, default = 'restrain'
+            Method for fixing updated atoms: `restrain`, `fix`, `protect`, `none`.
     SOURCE
         From PSICO(c) 2010-2012 Thomas Holder, MPI for Developmental Biology
     """
@@ -397,14 +431,19 @@ def sculpt_homolog(mobile, target, state=1, cycles=1_000, *, fix="restrain", qui
 def sbond(atom1="(pk1)", atom2="(pk2)", length=2.0, state=1, cycles=1_000, *, _self=cmd):
     """
     DESCRIPTION
-        Bond two selected atoms and relax the structure
+        Bond two selected atoms and relax the structure. Use the `PkAt` mouse action
+        (typically, :kbd:`Ctrl` + :kbd:`middle-click`).
     USAGE 
         sbond [ atom1 [, atom2 [, length [, state, [, cycles ]]]]]
     ARGUMENTS
-        atom1, atom2 = str: Atom selection to bond
-        length = str: Bond length {default: 2.0}
-        state = int: Selected state {default: 1}
-        cycles: Number of sculpt iterations {default: 1000}   
+        atom1, atom2 : str, default = '(pk1)', '(pk2)'
+            Atom selection to bond.
+        length : float, default = 2.0
+            Bond length in Angstroms.
+        state : int, default = 1
+            Selected state.
+        cycles : int, default = 1000
+            Number of sculpt iterations.   
     """
     length = float(length)
     # Get atoms positions
@@ -427,6 +466,7 @@ def sbond(atom1="(pk1)", atom2="(pk2)", length=2.0, state=1, cycles=1_000, *, _s
     # Form a bond between selection
     # NOTE: This must be the last step otherwise procedure will not work
     _self.bond(atom1, atom2)
+    _self.edit(atom1, atom2)
 
 
 # Autocomplete

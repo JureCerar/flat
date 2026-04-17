@@ -13,6 +13,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""
+:mod:`flat.msms`
+================
+Module for computing molecular surfaces using `MSMS`_
+
+Installation
+------------
+MSMS can be installed with by downloading precompiled binaries from: `msms/downloads`_
+
+.. _MSMS:
+    https://ccsb.scripps.edu/msms/
+.. _msms/downloads:
+    https://ccsb.scripps.edu/msms/downloads/
+"""
+
 import tempfile
 import subprocess
 from pathlib import Path
@@ -21,7 +36,7 @@ from pymol import cmd
 from .exporting import save_xyzr
 
 @cmd.extend
-def msms(selection="polymer", state=1, density=3, name=None,
+def msms(selection="polymer", state=1, density=3.0, name="msms",
          filename=None, *, exe="msms", _self=cmd):
     """
     DESCRIPTION
@@ -29,11 +44,17 @@ def msms(selection="polymer", state=1, density=3, name=None,
     USAGE
         msms [ selection [, state [, density [, name [, filename ]]]]]
     ARGUMENTS
-        selection = str: atom selection {default: polymer}
-        state = int: object state {default: 1}
-        density = float: MSMS surface point density. {default: 3}
-        name = str: name of CGO object to create. {default: None}
-        filename = str: Name of output file (without extension). {default: None}
+        selection : str, optional
+            Atom selection.
+        state : int, default = 1
+            Object state.
+        density : float, default = 3.0
+            MSMS triangulation density. Typical values are 1.0 for large
+            molecules (>1000 atoms) and 3.0 for smaller molecules.
+        name : str, default = 'msms'
+            Name of CGO object to create
+        filename : str, default = None
+            Name of output file(s) (without extension).
     SOURCE
         From PSICO (c) 2010-2012 Thomas Holder, MPI for Developmental Biology
     """
@@ -56,7 +77,7 @@ def msms(selection="polymer", state=1, density=3, name=None,
                                "-if", str(tmp_if), "-of", str(filename), "-no_area",
                                "-probe_radius", solvent_radius,], cwd=tmpdir, shell=True)
         if not name:
-            name = _self.get_unused_name("surface")
+            name = _self.get_unused_name("msms")
         _self.load(str(filename) + ".face", name, _self=_self)
 
 

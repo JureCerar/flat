@@ -13,6 +13,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""
+:mod:`flat.shapes`
+==================
+Module for drawing shape using Compiled Graphics Objects (CGO).
+"""
+
 from pymol import cgo, cmd
 from pymol.chempy import cpv
 
@@ -26,11 +32,19 @@ def cube(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, length=(1, 1, 1),
     USAGE 
         cube [ center [, normal [, rotation, [, length [, color ]]]]]
     ARGUMENTS
-        center = float3: shape position {default: 0, 0, 0}
-        normal = float3: orientation of shape {default: 1, 0, 0}
-        rotation = float: rotation around normal in rad {default: 0}
-        length = float3: dimensions {default: 1, 1, 1}
-        color = string: color name {default: None}
+        center : float3, default = (0, 0, 0)
+            Shape position in Angstroms.
+        normal : float3, default = (0, 0, 1)
+            Orientation of shape (normal vector).
+        rotation : float, default = 0
+            Rotation around normal in radians.
+        length : float3, default = (0, 0, 0)
+            Dimensions of the shape in Angstroms.
+        color : str, optional
+            Shape color.
+    RETURNS
+        : List
+            Coordinate data for the CGO.
     REFERENCE
         https://wiki.pymol.org/index.php/Cubes
     """
@@ -149,10 +163,17 @@ def sphere(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
     USAGE 
         sphere [ center [, normal [, radius, [, color ]]]]
     ARGUMENTS
-        center = float3: object position  {default: 0, 0, 0}
-        normal = float3: orientation of object  {default: 0, 0, 1}
-        radius = float: object's radius {default: 1}
-        color = string: object color {default: None}
+        center : float3, default = (0, 0, 0)
+            Shape position in Angstroms.
+        normal : float3, default = (0, 0, 1)
+            Orientation of shape (normal vector).
+        radius : float, default = 0.5
+            Shape radius in Angstroms.
+        color : str, optional
+            Shape color.
+    RETURNS
+        : List
+            Coordinate data for the CGO.
     REFERENCE
         https://pymolwiki.org/index.php/CGO_Shapes
     """
@@ -184,13 +205,21 @@ def cylinder(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
     DESCRIPTION
         Return a CGO cylinder object.
     USAGE 
-        sphere [ center [, normal [, radius, [, height [, color ]]]]]
+        cylinder [ center [, normal [, radius, [, height [, color ]]]]]
     ARGUMENTS
-        center = float3: object position  {default: 0, 0, 0}
-        normal = float3: orientation of object  {default: 0, 0, 1}
-        radius = float: object's radius {default: 1}
-        height = float: object's height {default: 1}
-        color = string: object color {default: None}
+        center : float3, default = (0, 0, 0)
+            Shape position in Angstroms.
+        normal : float3, default = (0, 0, 1)
+            Orientation of shape (normal vector).
+        radius : float, default = 0.5
+            Shape radius in Angstroms.
+        height : float, default = 1.0
+            Shape height in Angstroms.
+        color : str, optional
+            Shape color.
+    RETURNS
+        : List
+            Coordinate data for the CGO.
     REFERENCE
         https://pymolwiki.org/index.php/CGO_Shapes
     """
@@ -229,13 +258,21 @@ def cone(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
     DESCRIPTION
         Return a CGO cone object.
     USAGE 
-        sphere [ center [, normal [, radius, [, height [, color ]]]]]
+        cone [ center [, normal [, radius, [, height [, color ]]]]]
     ARGUMENTS
-        center = float3: object position  {default: 0, 0, 0}
-        normal = float3: orientation of object  {default: 0, 0, 1}
-        radius = float: object's radius {default: 1}
-        height = float: object's height {default: 1}
-        color = string: object color {default: None}
+        center : float3, default = (0, 0, 0)
+            Shape position in Angstroms.
+        normal : float3, default = (0, 0, 1)
+            Orientation of shape (normal vector).
+        radius : float, default = 0.5
+            Shape radius in Angstroms.
+        height : float, default = 1.0
+            Shape height in Angstroms.
+        color : str, optional
+            Shape color.
+    RETURNS
+        : List
+            Coordinate data for the CGO.
     REFERENCE
         https://pymolwiki.org/index.php/CGO_Shapes
     """
@@ -273,6 +310,24 @@ def polygon(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, radius=0.5,
     """
     DESCRIPTION
         Return a CGO n-sided polygon object.
+    USAGE 
+        polygon [ center [, normal [, radius, [, height [, color ]]]]]
+    ARGUMENTS
+        center : float3, default = (0, 0, 0)
+            Shape position in Angstroms.
+        normal : float3, default = (0, 0, 1)
+            Orientation of shape (normal vector).
+        rotation : float, default = 0
+            Rotation around normal in radians.
+        radius : float, default = 0.5
+            Shape radius in Angstroms.
+        sides : int, default = 3
+            Number of polygon sides.
+        color : str, optional
+            Shape color.
+    RETURNS
+        : List
+            Coordinate data for the CGO.
     """
     from math import sin, cos, pi
 
@@ -321,20 +376,30 @@ def polygon(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, radius=0.5,
 
 @cmd.extend
 def prism(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, radius=0.5,
-          height=1, sides=3, color="",  *, quiet=1, _self=cmd):
+          height=1.0, sides=3, color="",  *, quiet=1, _self=cmd):
     """
     DESCRIPTION
         Return a CGO n-sided prism object.
     USAGE 
-        sphere [ center [, normal [, rotation [, radius [, height [, sides  [, color ]]]]]]]
+        prism [ center [, normal [, rotation [, radius [, height [, sides  [, color ]]]]]]]
     ARGUMENTS
-        center = float3: object position  {default: 0, 0, 0}
-        normal = float3: orientation of object  {default: 0, 0, 1}
-        rotation = float: rotation around normal in rad {default: 0}
-        radius = float: object's radius {default: 1}
-        height = float: object's height {default: 1}
-        sides = int: num of polygon sides {default: 3}
-        color = string: object color {default: None}
+        center : float3, default = (0, 0, 0)
+            Shape position in Angstroms.
+        normal : float3, default = (0, 0, 1)
+            Orientation of shape (normal vector).
+        rotation : float, default = 0
+            Rotation around normal in radians.
+        radius : float, default = 0.5
+            Shape radius in Angstroms.
+        height : float, default = 1.0
+            Shape height in Angstroms.
+        sides : int, default = 3
+            Number of polygon sides.
+        color : str, optional
+            Shape color.
+    RETURNS
+        : List
+            Coordinate data for the CGO.
     REFERENCE
         https://pymolwiki.org/index.php/CGO_Shapes
     """
@@ -423,13 +488,23 @@ def pyramid(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, radius=0.5,
     USAGE 
         pyramid [ center [, normal [, rotation, [, radius [, height [, sides  [, color ]]]]]]]
     ARGUMENTS
-        center = float3: object position  {default: 0, 0, 0}
-        normal = float3: orientation of object  {default: 0, 0, 1}
-        rotation = float: rotation around normal in rad {default: 0}
-        radius = float: object's radius {default: 1}
-        height = float: object's height {default: 1}
-        sides = int: num of pyramid sides {default: 3}
-        color = string: object color {default: None}
+        center : float3, default = (0, 0, 0)
+            Shape position in Angstroms.
+        normal : float3, default = (0, 0, 1)
+            Orientation of shape (normal vector).
+        rotation : float, default = 0
+            Rotation around normal in radians.
+        radius : float, default = 0.5
+            Shape radius in Angstroms.
+        height : float, default = 1.0
+            Shape height in Angstroms.
+        sides : int, default = 3
+            Number of polygon sides.
+        color : str, optional
+            Shape color.
+    RETURNS
+        : List
+            Coordinate data for the CGO.
     REFERENCE
         https://pymolwiki.org/index.php/CGO_Shapes
     """
@@ -503,6 +578,25 @@ def torus(center=(0, 0, 0), normal=(0, 0, 1), radius=0.5,
     """
     DESCRIPTION
         Return a CGO torus object.
+    USAGE
+        torus [ center [, normal [, radius [, cradius [, color [, samples ]]]]]]
+    ARGUMENTS
+        center : float3, default = (0, 0, 0)
+            Shape position in Angstroms.
+        normal : float3, default = (0, 0, 1)
+            Orientation of shape (normal vector).
+        radius : float, default = 0.5
+            Shape radius in Angstroms.
+        cradius : float, default = 0.25
+            Shape inner radius in Angstroms.
+        color : str, optional
+            Shape color.
+        samples, int, default = 20
+            Number of polygons sub-samples for the shape. More samples means 
+            less 'blocky' shape.
+    RETURNS
+        : List
+            Coordinate data for the CGO.
     REFERENCE
         cgobuilder, Copyright (c) Schrodinger, LLC
     """
@@ -598,11 +692,19 @@ def octahedron(center=(0, 0, 0), normal=(0, 0, 1), rotation=0,
     USAGE 
         octahedron [ center [, normal [, rotation, [, length [, color ]]]]]
     ARGUMENTS
-        center = float3: object position  {default: 0, 0, 0}
-        normal = float3: object orientation {default: 0, 0, 1}
-        rotation = float: rotation around normal [rad] {default: 0}
-        length = float: object side length {default: 1}
-        color = string: object color {default: None}
+        center : float3, default = (0, 0, 0)
+            Shape position in Angstroms.
+        normal : float3, default = (0, 0, 1)
+            Orientation of shape (normal vector).
+        rotation : float, default = 0
+            Rotation around normal in radians.
+        length : float, default = 1.0
+            Shape side length in Angstroms.
+        color : str, optional
+            Shape color.
+    RETURNS
+        : List
+            Coordinate data for the CGO.
     """
     from math import sqrt
 
@@ -678,21 +780,35 @@ def octahedron(center=(0, 0, 0), normal=(0, 0, 1), rotation=0,
 
 @cmd.extend
 def star(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, sides=5,
-          radius=(1.0, 0.5), height=1, color="", *, quiet=1, _self=cmd):
+         radius=1.0, cradius=0.5, height=1, color="", *, quiet=1, _self=cmd):
     """
     DESCRIPTION
         Return a CGO star prism object.
     USAGE 
         star [ center [, normal [, rotation, [, sides [, radius, [ height [, color ]]]]]]]
     ARGUMENTS
-        center = float3: object position  {default: 0, 0, 0}
-        normal = float3: object orientation {default: 0, 0, 1}
-        rotation = float: rotation around normal [rad] {default: 0}
-        sides = int: number of star points {default: 5}
-        radius = float2: inner and outer star radius {default: 1.0, 0.5}
-        height = float: object height {default: 1}
+        center : float3, default = (0, 0, 0)
+            Shape position in Angstroms.
+        normal : float3, default = (0, 0, 1)
+            Orientation of shape (normal vector).
+        rotation : float, default = 0
+            Rotation around normal in radians.
+        sides : int, default = 5
+            Number of star arms.
+        radius : float, default = 1.0
+            Shape radius in Angstroms.
+        cradius : float, default = 0.5
+            Shape inner-radius in Angstroms.
+        height : float, default = 1.0
+            Shape height in Angstroms.
+        color : str, optional
+            Shape color.
+    RETURNS
+        : List
+            Coordinate data for the CGO.
     """
     from math import cos, sin, pi
+    # NOTE to self: I'm quite proud of this one.
 
     sides, quiet = int(sides), int(quiet)
     rotation, height = float(rotation), float(height)
@@ -700,8 +816,8 @@ def star(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, sides=5,
         center = _self.safe_list_eval(center)
     if _self.is_string(normal):
         normal = _self.safe_list_eval(normal)
-    if _self.is_string(radius):
-        radius = _self.safe_list_eval(radius)
+    if _self.is_string(radius_tuple):
+        radius_tuple = _self.safe_list_eval(radius_tuple)
     if color and isinstance(color, str):
         color = _self.get_color_tuple(color)
 
@@ -719,9 +835,7 @@ def star(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, sides=5,
     def add_vertex(xyz):
         _xyz = cpv.transform(rotmat, cpv.transform(matrix, xyz))
         return obj.extend([cgo.VERTEX] + cpv.add(center, _xyz))
-
-    outer_radius, inner_radius = radius
-
+    
     # Top
     obj.append(cgo.BEGIN)
     obj.append(cgo.TRIANGLE_FAN)
@@ -730,7 +844,7 @@ def star(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, sides=5,
     add_normal((0, 0, 1))
     add_vertex((0, 0, height/2))
     for i in range(sides * 2 + 1)[::-1]:
-        r = outer_radius if i % 2 == 0 else inner_radius
+        r = radius if i % 2 == 0 else cradius
         v = (r * sin(i * pi / sides), r * cos(i * pi / sides), height/2)
         add_vertex(v)
     obj.append(cgo.END)
@@ -744,7 +858,7 @@ def star(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, sides=5,
     add_vertex((0, 0, -height/2))
     angle = pi / sides
     for i in range(sides * 2 + 1):
-        r = outer_radius if i % 2 == 0 else inner_radius
+        r = radius if i % 2 == 0 else cradius
         v = (r * sin(i * pi / sides), r * cos(i * pi / sides), -height/2)
         add_vertex(v)
     obj.append(cgo.END)
@@ -752,13 +866,13 @@ def star(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, sides=5,
     # Right side
     for i in range(sides):
         angle = 2 * pi * (i + 0.5) / sides
-        t1 = (inner_radius * sin(angle), inner_radius * cos(angle), height/2)
+        t1 = (cradius * sin(angle), cradius * cos(angle), height/2)
         angle = 2 * pi * i / sides
-        t2 = (outer_radius * sin(angle), outer_radius * cos(angle), height/2)
+        t2 = (radius * sin(angle), radius * cos(angle), height/2)
         angle = 2 * pi * (i + 0.5) / sides
-        b1 = (inner_radius * sin(angle), inner_radius * cos(angle), -height/2)
+        b1 = (cradius * sin(angle), cradius * cos(angle), -height/2)
         angle = 2 * pi * i / sides
-        b2 = (outer_radius * sin(angle), outer_radius * cos(angle), -height/2)
+        b2 = (radius * sin(angle), radius * cos(angle), -height/2)
         x1, x2 = cpv.sub(b1, t1), cpv.sub(b2, t1)
         obj.append(cgo.BEGIN)
         obj.append(cgo.TRIANGLE_STRIP)
@@ -774,13 +888,13 @@ def star(center=(0, 0, 0), normal=(0, 0, 1), rotation=0, sides=5,
     # Left side
     for i in range(sides):
         angle = 2 * pi * (i - 0.5) / sides
-        t1 = (inner_radius * sin(angle), inner_radius * cos(angle), height/2)
+        t1 = (cradius * sin(angle), cradius * cos(angle), height/2)
         angle = 2 * pi * i / sides
-        t2 = (outer_radius * sin(angle), outer_radius * cos(angle), height/2)
+        t2 = (radius * sin(angle), radius * cos(angle), height/2)
         angle = 2 * pi * (i - 0.5) / sides
-        b1 = (inner_radius * sin(angle), inner_radius * cos(angle), -height/2)
+        b1 = (cradius * sin(angle), cradius * cos(angle), -height/2)
         angle = 2 * pi * i / sides
-        b2 = (outer_radius * sin(angle), outer_radius * cos(angle), -height/2)
+        b2 = (radius * sin(angle), radius * cos(angle), -height/2)
         x1, x2 = cpv.sub(b2, t2), cpv.sub(b1, t2)
         obj.append(cgo.BEGIN)
         obj.append(cgo.TRIANGLE_STRIP)

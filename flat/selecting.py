@@ -13,6 +13,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""
+:mod:`flat.selecting`
+=====================
+Module to help with selection of molecular objects.
+"""
+
 from pymol import cmd, CmdException
 
 
@@ -20,16 +26,22 @@ from pymol import cmd, CmdException
 def find_seq(pattern, selection="all", name="sele", merge=False, *, _self=cmd):
     """
     DESCRIPTION
-        Given a sequence/regex to find, select those matching 
-        amino acids in the protein.
+        Given a sequence/regex to find, select those matching amino acids in the protein.
     USAGE
         find_seq pattern, [ selection [, name [, merge ]]]
     ARGUMENTS
-        pattern = str: the sequence of amino acids to match and selection.
+        pattern : str
+            Sequence of amino acids to match and selection.
             This can be a sequence of amino acids or a regular expression.  
-        selection = str: a selection-expression. {default: "all"}
-        name = str: a unique name for the selection. {default: "sele"}
-        merge = int: merge to existing selection. {default: False}
+        selection : str, default = 'all'
+            Atom selection.
+        name : str, default = 'sele'
+            Unique name for the selection.
+        merge : bool, default = False
+            Merge to existing selection.
+    RETURNS
+        : str
+            Selection name.
     EXAMPLE
         >>> find_seq N[^P][TS]
     """
@@ -72,21 +84,28 @@ def find_seq(pattern, selection="all", name="sele", merge=False, *, _self=cmd):
 
 
 @cmd.extend
-def diff(sele1, sele2, byres=1, name=None, operator="in", quiet=0, *, _self=cmd):
+def diff(sele1, sele2, byres=True, name=None, operator="in", quiet=0, *, _self=cmd):
     """
     DESCRIPTION
-        Difference between two molecules
+        Select difference between two molecules.
     USAGE 
         diff sele1, sele2 [, byres [, name [, operator ]]]
     ARGUMENTS
-        sele1 = string: atom selection.
-        sele2 = string: atom selection.
-        byres = 0/1: report residues, not atoms (does not affect selection). {default: 1}
-        operator = in/like/align: operator to match atoms {default: in}
+        sele1, sele2 : str
+            Atom selections.
+        byres : bool, default = True
+            Report residues, not atoms (does not affect selection).
+        name : str, optional
+            Name of the selection.
+        operator : str, default = 'in'
+            operator to match atoms: `in`, `like`, or `align`:
+    RETURNS
+        : str
+            Selection name.
     SOURCE
         From PSICO (c) 2010-2012 Thomas Holder, MPI for Developmental Biology
     SEE ALSO
-        symdiff
+        :func:`symdiff`
     """
     byres, quiet = int(byres), int(quiet)
     if name is None:
@@ -119,14 +138,21 @@ def symdiff(sele1, sele2, byres=1, name=None, operator="in", quiet=0, *, _self=c
     USAGE 
         symdiff sele1, sele2 [, byres [, name [, operator ]]]
     ARGUMENTS
-        sele1 = string: atom selection.
-        sele2 = string: atom selection.
-        byres = 0/1: report residues, not atoms (does not affect selection). {default: 1}
-        operator = in/like/align: operator to match atoms {default: in}
+        sele1, sele2 : str
+            Atom selections.
+        byres : bool, default = True
+            Report residues, not atoms (does not affect selection).
+        name : str, optional
+            Name of the selection.
+        operator : str, default = 'in'
+            operator to match atoms: `in`, `like`, or `align`:
+    RETURNS
+        : str
+            Selection name.
     SOURCE
         From PSICO (c) 2010-2012 Thomas Holder, MPI for Developmental Biology
     SEE ALSO
-        diff
+        :func:`diff`
     """
     byres, quiet = int(byres), int(quiet)
     if name is None:
@@ -139,10 +165,17 @@ def symdiff(sele1, sele2, byres=1, name=None, operator="in", quiet=0, *, _self=c
     return name
 
 
-def wait_for(name, state=0, quiet=1, *, _self=cmd):
+def wait_for(name, state=0, *, _self=cmd):
     """
     DESCRIPTION
         Wait for "name" to be available as selectable object.
+    USAGE
+        wait_for name [, state ]
+    ARGUMENTS
+        name : str
+            Name of object.
+        state : int, default = 0
+            Selected state.
     SOURCE
         From PSICO (c) 2010-2012 Thomas Holder, MPI for Developmental Biology
     """

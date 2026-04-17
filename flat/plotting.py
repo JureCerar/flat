@@ -13,31 +13,36 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""
+:mod:`flat.plotting`
+====================
+Module for plotting data within PyMOL.
+
+.. note::
+
+    Module has optional dependency to `mplcursors` python package.
+    Install package with `pip install mplcursors`.
+"""
+
 from pymol import cmd, CmdException
 import matplotlib.pyplot as plt
 import numpy as np 
 import warnings
-import pathlib
+from pathlib import Path
 
 
 def _showfigure(fig, filename, quiet):
-    """
-    DESCRIPTION
-        Helper function for plot commands.
-    """
+    """Helper function for plot commands"""
     if not quiet:
         fig.show()
     if filename:
         fig.savefig(filename)
         if not quiet:
-            print(f"Plot written to: '{filename}'")
+            print(f"Plot written to: {filename!r}")
 
 
-def get_model_color(selection, *, _self=cmd):
-    '''
-    DESCRIPTION
-        API only. Get model color as RGB hex string to be used with matplotlib.
-    '''
+def _get_model_color(selection, *, _self=cmd):
+    """Get model color as RGB hex string to be used with matplotlib."""
     colors = []
     for guide in ("guide", "elem C", "all"):
         _self.iterate(
@@ -62,34 +67,42 @@ def get_model_color(selection, *, _self=cmd):
 
 
 @cmd.extend
-def plot(expression="b", selection="all", fmt="-", byres=1,
+def plot(expression="b", selection="all", fmt="-", byres=True,
          filename=None, *, quiet=1, _self=cmd, **kwargs):
     """
     DESCRIPTION
-        Plot property with matplotlib
+        Plot selected property or expression with matplotlib
     USAGE
         plot [ expression [, selection [, fmt, [, byres, [, filename ]]]]]
     ARGUMENTS
-        expression = string: atom property to plot. {default: b}
-        selection = string: atom selection. {default: all}
-        fmt = string: Plotting format: (see matplotlib). {default: -}
-        byres = integer: controls whether coloring is applied per-residue. {default: 0}
-        filename = string: save figure to file. {default: None}
+        expression : str, default = 'b'
+            Atom property or expression to plot.
+        selection : str, default = 'all'
+            Atom selection.
+        fmt : str, default = '-'
+            Plotting format (see matplotlib documentation).
+        byres : bool, default = True
+            Plot properties per-residue instead of per-atom.
+        filename : str, optional
+            Save figure to file.
+    RETURNS
+        : matplotlib.figure.Figure
+            Figure object.
     """
     fig, ax = plt.subplots()
     lines = []
     labels = []
 
-    for model in cmd.get_object_list(selection):
-        for chain in cmd.get_chains(model):
-            color = get_model_color(
+    for model in _self.get_object_list(selection):
+        for chain in _self.get_chains(model):
+            color = _get_model_color(
                 f"({selection}) & {model} & c. '{chain}'", _self=_self)
             x_list = list()
             y_list = list()
             label_list = list()
 
             if int(byres):
-                cmd.iterate(
+                _self.iterate(
                     f"bca. ({selection}) & {model} & c. '{chain}'",
                     "x_list.append(int(resi));" + \
                     f"y_list.append({expression});" + \
@@ -97,7 +110,7 @@ def plot(expression="b", selection="all", fmt="-", byres=1,
                     space=locals(),
                 )
             else:
-                cmd.iterate(
+                _self.iterate(
                     f"{selection} & o. {model} & c. '{chain}'",
                     "x_list.append(index);" +
                     f"y_list.append({expression});" +
@@ -142,10 +155,17 @@ def plot_contacts(selection="guide", metric="euclidean", *,
     USAGE
         plot_contacts [ selection [, metric [, state [, filename ]]]]
     ARGUMENTS
-        selection = string: atom selection. {default: guide}
-        metric = euclidean | sqeuclidean: metric for distance matrix {default: euclidean}
-        state = int: state index or all states if state=0 {default: -1}
-        filename = string: save figure to file. {default: None}
+        selection : str, default = 'guide'
+            Atom selection.
+        metric : str, default = 'euclidean'
+            Metric for distance matrix.
+        state : int, default = -1
+            State index or all states if state=0 {default: -1}
+        filename : str, optional
+            Save figure to file.
+    RETURNS
+        : matplotlib.figure.Figure
+            Figure object.
     SOURCE
         From PSICO (c) 2011-2012 Thomas Holder, MPI for Developmental Biology
     """
@@ -175,28 +195,40 @@ def plot_ramachandran(selection="guide", fmt=".", state=-1, ref=1,
     USAGE
         plot_ramachandran [ selection [, fmt [, state [, ref [, filename ]]]]]
     ARGUMENTS
-        selection = string: atom selection. {default: guide}
-        fmt = string: Plotting format: (see matplotlib). {default: .}
-        state = int: state index or all states if state=0 {default: -1}
-        ref = bool: plot reference Ramachandra dihedrals {default: True}
-        filename = string: save figure to file. {default: None}
+        selection : str, default = 'guide'
+            Atom selection.
+        fmt : str, default = '.'
+            Plotting format (see matplotlib documentation).
+        state : int, default = -1
+            State index or all states if state=0 {default: -1}
+        ref : bool, default = True
+            Plot reference Ramachandra dihedrals.
+        filename : str, optional
+            Save figure to file.
+    RETURNS
+        : matplotlib.figure.Figure
+            Figure object.
     SOURCE
         Reference Ramachandra plot was taken from MDAnalysis dihedral package:
         Michaud-Agrawal, J. Comput. Chem., 2011, doi:10.1002/jcc.21787
     SEE ALSO
-        phi_psi
+        :func:`phi_psi`
     """
     fig, ax = plt.subplots()
 
     ax.axis([-180, 180, -180, 180])
-    ax.set(xticks=range(-180, 181, 60), yticks=range(-180, 181, 60),
-           xlabel=r"$\phi$ [deg]", ylabel=r"$\psi$ [deg]")
+    ax.set(
+        xticks=range(-180, 181, 60),
+        yticks=range(-180, 181, 60),
+        xlabel=r"$\phi$ [deg]",
+        ylabel=r"$\psi$ [deg]"
+    )
 
     lines, labels = [], []
     for model in _self.get_object_list(selection):
         for chain in _self.get_chains(model):
 
-            color = get_model_color(
+            color = _get_model_color(
                 f"({selection}) & {model} & c. '{chain}'", _self=_self)
             r = _self.get_phipsi(
                 f"({selection}) & {model} & c. '{chain}'", state, _self=_self)
@@ -240,8 +272,8 @@ def plot_ramachandran(selection="guide", fmt=".", state=-1, ref=1,
 
     if int(ref):
         # Load reference Ramachandra plot
-        path = pathlib.Path(__file__).parent.resolve()
-        rama_ref = pathlib.Path.joinpath(path, "data", "rama_ref.npy")
+        path = Path(__file__).parent.resolve()
+        rama_ref = Path.joinpath(path, "data", "rama_ref.npy")
         levels = [1, 17, 15000]
         colors = ["#eeeeee", "#dfdfdf"]
         X, Y = np.meshgrid(np.arange(-180, 180, 4), np.arange(-180, 180, 4))

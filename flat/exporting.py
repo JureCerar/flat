@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2024 Jure Cerar
+# Copyright (C) 2023-2026 Jure Cerar
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,24 +13,36 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from pymol import cmd, CmdException
+"""
+:mod:`flat.exporting`
+=====================
+Module that allows to save files in additional formats.
+"""
+
+from pymol import cmd
 import textwrap
 import csv
 
+
 @cmd.extend
-def save_gro(filename, selection, state, *, _self=cmd):
+def save_gro(filename, selection="all", state=0, *, _self=cmd):
     """
     DESCRIPTION
-        Save structure in GRO format.
+        Save structure in GROMACS configuration (.gro) format.
     USAGE
         save_gro filename [, selection [, state ]]
+    ARGUMENTS
+        filename : str
+            ... 
+        selection : str, optional
+            Atom selection.
+        state : int, default = 0
+            ...
     """
+    # NOTE to self: f.write does some strange things?! Just use print.
     with open(filename, "w") as f:
-        # Title
         print("Generated with PyMOL", file=f)
-        # Number of atoms
         print(_self.count_atoms(selection, state=state), file=f)
-        # Atoms positions
         fmt = "{:5d}{:5s}{:>5s}{:5d}{:8.3f}{:8.3f}{:8.3f}"
         callback = lambda *args: print(fmt.format(*args), file=f)
         _self.iterate_state(
@@ -39,7 +51,6 @@ def save_gro(filename, selection, state, *, _self=cmd):
             "callback(int(resi), resn, name, index, x/10, y/10, z/10)",
             space=locals()
         )
-        # Box dimensions
         try:
             box = [x/10 for x in _self.get_symmetry(selection, state)[:3]]
         except:
@@ -48,19 +59,25 @@ def save_gro(filename, selection, state, *, _self=cmd):
 
 
 @cmd.extend
-def save_csv(filename, selection="(all)", selector=None, var="b", *, quiet=1, _self=cmd):
+def save_csv(filename, selection="all", selector=None, var="b", *, quiet=1, _self=cmd):
     """
     DESCRIPTION
         Save property from selection to CSV file.
     USAGE
-        save_csv file [, selection [, var [, mode ]]]
+        save_csv filename [, selection [, selector [, var ]]]
     ARGUMENTS
-        file = str: Output file name.
-        selection = str: Atom selection. {default: all}
-        selector = list[str]: List of atom selectors to export properties.
-            If None it is stored as `chain`, `resn`, `resi`, and `name" {default: "atom"}
-        var = str: Property to save. {default: b}
+        filename : str
+            Output file name.
+        selection : str, default = 'all'
+            Atom selection.
+        selector : List(str), default = None
+            List or string of atom selectors to export properties. It
+            defaults to: `[chain, resn, resi, name]`.
+        var : str, default = 'b'
+            Property to export.
     """
+    if isinstance(selector, str):
+        selector = selector.split()
     if not selector:
         selector = ["chain", "resn", "resi", "name"]
     selector_key = ",".join(selector)
@@ -69,7 +86,6 @@ def save_csv(filename, selection="(all)", selector=None, var="b", *, quiet=1, _s
     # are multiple atoms that fit selector just store last one and say it's a feature
     data = dict()
     _self.iterate(selection, f"data[{selector_key}]={var}", space=locals())
-
     with open(filename, "w", newline="") as f:
         writer = csv.writer(f,)
         writer.writerow(selector + [var])
@@ -77,46 +93,51 @@ def save_csv(filename, selection="(all)", selector=None, var="b", *, quiet=1, _s
             writer.writerow([*key, val])
 
     if not int(quiet):
-        print(f"Save: Wrote '{filename}'")
+        print(f"Save: Wrote {filename!r}")
 
 
 @cmd.extend
 def save_ndx(filename, *, quiet=1, _self=cmd):
     """
     DESCRIPTION
-        Save all selections as GROMACS index (.ndx) file.
+        Save all selections as GROMACS index (.ndx) format.
     USAGE
-        save_ndx filename [, quiet ]]
+        save_ndx filename
+    ARGUMENTS
+        filename : str
+            Output file name.
     """
-    quiet = int(quiet)
-
     selections = _self.get_names("public_selections")
     groups = dict()
 
-    for name in selections:
-        groups[name] = list()
-        _self.iterate(name, "group.append(index)",
-                      space={"group": groups[name]})
+    # Gather all all indices
+    for sele in selections:
+        groups[sele] = list()
+        _self.iterate(sele, "group.append(index)",
+                      space={"group": groups[sele]})
+        if not int(quiet):
+            print(f"Saving group: {sele!r} ({len(groups[sele])} atoms)")
 
-    with open(filename, "w") as handle:
-        nlines = 15  # Number of indeces per line
+    NUM = 15  # Number of indices per line
+    with open(filename, "w") as f:
         for name, group in groups.items():
-            if not quiet:
-                print(f"Saving group: '{name}' len(group atoms)")
-            print(f"[ {name} ]", file=handle)
-            for i in range(0, len(group), nlines):
-                print(
-                    " ".join(f"{x:5}" for x in group[i:i+nlines]), file=handle)
-    return
+            print(f"[ {name} ]", file=f)
+            for i in range(0, len(group), NUM):
+                print(" ".join(f"{x:5}" for x in group[i:i+NUM]), file=f)
 
 
 @cmd.extend
-def save_pir(filename, selection="(all)", *, _self=cmd):
+def save_pir(filename, selection="all", *, _self=cmd):
     """
     DESCRIPTION
-        Save sequence in PIR format.
+        Save sequence in Protein Information Resource (PIR) format.
     USAGE
-        save_ndx filename [, quiet ]]
+        save_ndx filename [, selection ]
+    ARGUMENTS
+        filename : str
+            Output file name.
+        selection : str, default = 'all'
+            Atom selection.
     """
     from pymol.exporting import _resn_to_aa as one_letter
     
@@ -131,7 +152,6 @@ def save_pir(filename, selection="(all)", *, _self=cmd):
         resn = [a.resn for a in mdl.atom]
         resi = [a.resi_number for a in mdl.atom]
         chain = [a.chain for a in mdl.atom]
-
         # Construct header and info lines
         buffer.extend(
             [
@@ -140,7 +160,6 @@ def save_pir(filename, selection="(all)", *, _self=cmd):
                 f"structureX:{obj}:{resi[0]}:{chain[0]}:{resi[-1]}:{chain[-1]}:::-1.00:-1.00"
             ]
         )
-
         # Get 1-letter amino acid sequence
         seq = ""
         prev = None
@@ -154,34 +173,34 @@ def save_pir(filename, selection="(all)", *, _self=cmd):
         seq += "*"
         buffer += textwrap.wrap(seq, 75)
 
-    with open(filename, "w") as handle:
-        print("\n".join(buffer), handle)
-    
-    return
+    with open(filename, "w") as f:
+        print("\n".join(buffer), file=f)
 
 
 @cmd.extend
-def save_mda(filename, selection="(all)", *, quiet=1, _self=cmd):
+def save_mda(filename, selection="all", *, quiet=1, _self=cmd):
     """
     DESCRIPTION
-        Save a trajectory file with the MDAnalysis Python library.
+        Save a trajectory file with the MDAnalysis library.
     USAGE
-        save_mda filename [, selection]
+        save_mda filename [, selection ]
+    ARGUMENTS
+        filename : str
+            Output file name.
+        selection : str, default = 'all'
+            Atom selection.
     """
     import MDAnalysis
     import tempfile
-    import os
 
     # Generate and read temporary topology
-    temp = tempfile.mktemp(".pdb")
-    try:
-        _self.save(temp, selection)
-        u = MDAnalysis.Universe(temp, in_memory=True, trajectory=True)
-    finally:
-        os.unlink(temp)
+    with tempfile.NamedTemporaryFile(suffix=".pdb") as tmp:
+        _self.save(tmp, selection)
+        tmp.flush()
+        u = MDAnalysis.Universe(tmp, in_memory=True, trajectory=True)
 
-    if os.path.exists(filename):
-        os.remove(filename)
+    # if os.path.exists(filename):
+    #     os.remove(filename)
 
     n_frames = _self.count_states(selection)
     with MDAnalysis.Writer(filename, u.atoms.n_atoms) as handle:
@@ -191,16 +210,25 @@ def save_mda(filename, selection="(all)", *, quiet=1, _self=cmd):
             handle.write(u)
 
     if not int(quiet):
-        print(f"Wrote {n_frames} frames to file: '{filename}'")
+        print(f"Wrote {n_frames} frames to file: {filename!r}")
 
 
 @cmd.extend
-def save_colored_fasta(filename, selection="(all)", invert=0, *, _self=cmd):
+def save_colored_fasta(filename, selection="all", invert=False, *, _self=cmd):
     """
     DESCRIPTION
-        Save a HTML file with colored (by C-alpha atoms) fasta sequence.
+        Save a HTML file with colored (by C-alpha atoms) FASTA sequence.
     USAGE
         save_colored_fasta filename [, selection [, invert ]]]
+    ARGUMENTS
+        filename : str
+            Output file name.
+        selection : str, default = 'all'
+            Atom selection.
+        invert : bool, default = False
+            Color background instead of character.
+    SOURCE
+        From PSICO (c) 2012 Thomas Holder, MPI for Developmental Biology
     """
     # See: https://github.com/speleo3/pymol-psico/blob/master/psico/fasta.py
     from pymol import Scratch_Storage
@@ -257,17 +285,22 @@ def save_colored_fasta(filename, selection="(all)", invert=0, *, _self=cmd):
         print("".join(html), file=handle)
         print("</body></html>", file=handle)
 
-    return
-
 
 @cmd.extend
-def save_xyzr(filename, selection="(all)", state=1, *, _self=cmd):
+def save_xyzr(filename, selection="all", state=1, *, _self=cmd):
     """
     DESCRIPTION
         Write the given selection to an xyzr or xyzrn (determined by extension)
         file for MSMS.
     USAGE
         save_xyzr filename [, selection [, state ]]]
+    ARGUMENTS
+        filename : str
+            Output file name.
+        selection : str, default = 'all'
+            Atom selection.
+        state : int, default = 1
+            Object state.
     """
     if filename.endswith("xyzrn"):
         expr = "callback(x, y, z, vdw, name, resn, resi)"

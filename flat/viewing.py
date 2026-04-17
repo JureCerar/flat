@@ -13,7 +13,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from pymol import cmd, cgo
+"""
+:mod:`flat.viewing`
+===================
+Module to help with molecule visualization
+"""
+
+from pymol import cmd, CmdException, cgo
 from pymol.chempy import cpv
 import numpy as np
 
@@ -26,8 +32,10 @@ def beautify(selection="all", mode=0, *, _self=cmd):
     USAGE
         beautify [ selection [, mode ]]
     ARGUMENTS
-        selection = str: Atom selection. {default: all}
-        mode = int: Display mode. {default: 0}
+        selection : str, optional
+            Atom selection.  
+        mode : int, default = 0
+            Display mode.
     """
     mode = int(mode)
     _self.hide("everything", selection)
@@ -42,29 +50,33 @@ def beautify(selection="all", mode=0, *, _self=cmd):
     _self.show(repr, f"((byres ({selection})) & (sc. | (n. CA | n. N & r. PRO)))")
     _self.hide(f"({selection} and hydro and (e. C extend 1))")
     _self.color("atomic", f"({selection}) and ! e. C")
-    return
 
 
 @cmd.extend
-def text(expression, selection="polymer", size=26, va=0.8, ha=0.0, *, _self=cmd):
+def title(label, selection="polymer", size=26, va=0.8, ha=0.0, *, _self=cmd):
     """
     DESCRIPTION
-        Display text over selection.
+        Display title over selection.
     USAGE
-        text expression [, selection [, size [, va [, ha ]]]]
+        title label [ selection [, size [, va  [, ha ]]]]
     ARGUMENTS
-        expression = str: Text to display
-        selection = str: Atom selection. {default: polymer}
-        size = int: Text size. {default: 26}
-        va = float: Vertical alignment (0 is center). {default: 0.0}
-        ha = float: Horizontal alignment (0 is center). {default: 0.8}
+        label : str
+            Text to display
+        selection : str, default = 'polymer'
+            Atom selection
+        size : int, default = 26
+            Text size
+        va : float, default = 0.0
+            Vertical alignment where 0 is center
+        ha : float, default = 0.8
+            Horizontal alignment where 0 is center
     """
     size, ha, va = int(size), float(ha), float(va)
     com = _self.centerofmass(selection)
     vmin, vmax = _self.get_extent(selection)
     dist = cpv.distance(vmin, vmax) / 2
-    name = _self.get_unused_name("text")
-    _self.pseudoatom(name, label=expression, pos=com)
+    name = _self.get_unused_name("title")
+    _self.pseudoatom(name, label=label, pos=com)
     _self.set("label_position", (dist * ha, dist * va, 0), name)
     _self.set("label_size", size, name)
 
@@ -73,11 +85,16 @@ def text(expression, selection="polymer", size=26, va=0.8, ha=0.0, *, _self=cmd)
 def filter(mode=1, *, _self=cmd):
     """
     DESCRIPTION
-        Apply different (instagram) filter to molecules for rendering.
+        Apply different preset filters to molecules for rendering:
+
+        * 0 = PyMol default style 
+        * 1 = Simple FLAT style  
+        * 2 = Pretty figure style
     USAGE
         filter [ mode ]
     ARGUMENTS
-        mode = int: ... {default: 1}
+        mode : int, default = 1
+            Render mode preset
     """
     mode = int(mode)
     if mode == 1:
@@ -121,7 +138,6 @@ def filter(mode=1, *, _self=cmd):
     else:
         # Set back to defaults
         _self.reinitialize("settings")
-    return
 
 
 class PutCenterCallback(object):
@@ -188,6 +204,9 @@ def axis(name="axis", *, _self=cmd):
         Puts coordinate axes to the lower left corner of the viewport.
     USAGE
         axis [ name ]
+    ARGUMENTS
+        name : str, default = 'axis'
+            Name of the axis object 
     """
     _self.set("auto_zoom", 0)
     width = 0.06  # cylinder width
@@ -205,28 +224,37 @@ def axis(name="axis", *, _self=cmd):
         cgo.CONE, 0.0, 0.0,   length, 0.0, 0.0, hight +
         length, d, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0
     ]
-
     # Display
     PutCenterCallback(name, 1).load()
     _self.load_cgo(obj, name, zoom=0)
 
-    return
-
 
 @cmd.extend
-def bounding_box(selection="all", state=0, vis=1, color="yellow", quiet=0, *, _self=cmd):
+def bounding_box(selection="all", state=0, vis=1, color="yellow", lw=2.0, *, quiet=0, _self=cmd):
     """
     DESCRIPTION
         Draws a bounding box around a given selection. 
     USAGE
-        bounding_box [ selection [, state [, vis [, color [, quiet ]]]]]
+        bounding_box [ selection [, state [, vis [, color ]]]]
+    ARGUMENTS
+        selection : str, optional
+            Atom selection
+        state : int, default = 0
+            Object state where 0 is all states
+        vis : bool, default = True
+            Whether to visualize the bounding box
+        color : str, default = 'yellow'
+            Color of the bounding box
+    RETURNS
+        : ndarray
+            Array of shape (3,) with bounding box dimensions in Angstroms   
     """
-    state, vis, quiet = int(state), int(vis), int(quiet)
+    state, vis, lw, quiet = int(state), int(vis), float(lw), int(quiet)
     rgb = _self.get_color_tuple(color)
 
     xyz = np.array(_self.get_coords(selection, state)).T
 
-    # For what this vector magic is see reference bellow:
+    # For what all this vector magic is see the reference bellow:
     #  _notebooks/2021-04-20-3D-Oriented-Bounding-Box.ipynb
     means = np.mean(xyz, axis=1)
     cov = np.cov(xyz)
@@ -258,12 +286,11 @@ def bounding_box(selection="all", state=0, vis=1, color="yellow", quiet=0, *, _s
     ]
 
     if not quiet:
-        print(" Bounding Box:", result, "A")
+        print(" Bounding Box:", result, "Å")
 
     if vis:
-        linewidth = 2.00
         obj = [
-            cgo.LINEWIDTH, linewidth,
+            cgo.LINEWIDTH, lw,
             cgo.BEGIN, cgo.LINES,
             cgo.COLOR, *rgb,
             # z1 plane boundary
@@ -286,20 +313,23 @@ def bounding_box(selection="all", state=0, vis=1, color="yellow", quiet=0, *, _s
         name = _self.get_unused_name("BoundingBox")
         _self.load_cgo(obj, name, zoom=0)
 
-    return  result
+    return result
 
 
 @cmd.extend
-def gridbox(selection="(all)", grid=(5, 5, 5), color="white", lw=2.0, *, _self=cmd):
+def gridbox(selection="all", grid=(5, 5, 5), color="yellow", lw=2.0, *, _self=cmd):
     """
     DESCRIPTION
-        Given selection, draw a grid box around it.
+        Draw a grid box around selection.
     USAGE
-        gridbox [selection [, grid [, color ]]] 
+        gridbox [ selection [, grid [, color ]]]
     ARGUMENTS
-        selection = str: Atom selection {default: all}
-        grid = list: Number of grids on X, Y, and Z axis {default: [5, 5, 5]}
-        color = str: Color of the grid {default: white}
+        selection : str, optional
+            Atom selection
+        grid : array-like, shape (3,), default = (5, 5, 5)
+            Number of grids on X, Y, and Z axis
+        color : str, default = 'yellow'
+            Color of the grid box
     """
     vmin, vmax = np.array(_self.get_extent(selection))
 
@@ -309,7 +339,7 @@ def gridbox(selection="(all)", grid=(5, 5, 5), color="white", lw=2.0, *, _self=c
         color = _self.get_color_tuple(color)
     grid = np.array(grid, dtype=int)
     if grid.size != 3:
-        raise ValueError("Grid must be length 3")   
+        raise CmdException("Grid must be length 3")
 
     dv = (vmax - vmin) / grid
     obj = [
@@ -349,11 +379,9 @@ def gridbox(selection="(all)", grid=(5, 5, 5), color="white", lw=2.0, *, _self=c
                     cgo.VERTEX, vmin[0]+(i+1)*dv[0], vmin[1]+(j+1)*dv[1], vmin[2]+(k+1)*dv[2],
                 ])
     obj.append(cgo.END)
-
+    # Draw object
     name = _self.get_unused_name("gridbox")
     _self.load_cgo(obj, name, zoom=0)
-
-    return name
 
 
 # Autocomplete
@@ -363,5 +391,5 @@ cmd.auto_arg[0].update({
     "gridbox": cmd.auto_arg[0]["zoom"],
 })
 cmd.auto_arg[1].update({
-    "text": cmd.auto_arg[0]["zoom"],
+    "title": cmd.auto_arg[0]["zoom"],
 })

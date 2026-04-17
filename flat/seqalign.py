@@ -13,7 +13,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from pymol import cmd
 
 # TODO: Check for if it works for multi chain alignments
 def alignment_mapping(seq1, seq2):

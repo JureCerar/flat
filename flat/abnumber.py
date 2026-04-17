@@ -13,24 +13,49 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""
+:mod:`flat.abnumber`
+====================
+Module for Antibody numbering and alignment using ANARCI
+
+Installation
+------------
+This is an optional dependency of flat and can be installed with:
+
+.. code:: bash
+
+    pip install abnumber
+
+.. note::
+
+    Windows is not supported due to `HMMER`_ dependency. AbNumber
+    is currently only available on UNIX & MacOS.
+
+.. _HMMER:
+    https://github.com/EddyRivasLab/hmmer
+"""
+
+
 from pymol import cmd, CmdException
 
-
+# Antibody numbering schemes
 _CDR_SCHEMES = ["imgt", "chothia", "kabat", "aho"]
 """Antibody numbering schemes"""
  
 
 @cmd.extend
-def abnumber(selection="(all)", scheme="imgt", *, _self=cmd):
+def abnumber(selection="all", scheme="chothia", *, _self=cmd):
     """
     DESCRIPTION
         Select antibody CDR region according to Antibody Numbering
-        and Antigen Receptor Classification (ANARCI)
+        and Antigen Receptor Classification (ANARCI).
     USAGE
-        abnumber [ selection [, scheme [, exe ]]]
+        abnumber [ selection [, scheme ]]
     ARGUMENTS
-        selection = str: Atom selection. {default: all}
-        scheme = str: Which numbering scheme should be used. {default: imgt}
+        selection : str, optional
+            Atom selection.
+        scheme : str, default = 'chothia'
+            Which numbering scheme should be used.
     SCHEMES
         imgt, kabat, chothia, aho
     SEE ALSO
@@ -65,16 +90,18 @@ def abnumber(selection="(all)", scheme="imgt", *, _self=cmd):
 
 
 @cmd.extend
-def abrenumber(selection="(all)", scheme="imgt", *, _self=cmd):
+def abrenumber(selection="(all)", scheme="chothia", *, _self=cmd):
     """
     DESCRIPTION
         Renumber and rename (chains) antibodies according to 
         Antibody Numbering and Antigen Receptor Classification (ANARCI)
     USAGE
-        abrenumber [ selection [, scheme [, exe ]]]
+        abrenumber [ selection [, scheme ]]
     ARGUMENTS
-        selection = str: Atom selection. {default: all}
-        scheme = str: Which numbering scheme should be used. {default: imgt}
+        selection : str, optional
+            Atom selection.
+        scheme : str, default = 'chothia'
+            Which numbering scheme should be used.
     SCHEMES
         imgt, kabat, chothia, aho
     SEE ALSO
@@ -167,8 +194,6 @@ def abrenumber(selection="(all)", scheme="imgt", *, _self=cmd):
     # Set back original recursion limit
     # that we don't break anything
     sys.setrecursionlimit(limit)
-    
-    return
 
 
 # Autocomplete

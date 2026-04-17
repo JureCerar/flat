@@ -13,6 +13,22 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+r"""
+:mod:`flat.coloring`
+====================
+Module of adding a little color to your life.
+
+Palettes
+--------
+Available color palettes in Flat:
+
+.. image:: ../static/colors_flat.png
+    :width: 49%
+
+.. image:: ../static/colors_nvs.png
+    :width: 49%
+"""
+
 from pymol import cmd, menu
 from typing import Iterable
 import collections
@@ -34,14 +50,13 @@ _color_cycle = [
     "0xaa6fda", # purple
 ]
 
-# Attributes for coloring
-_attributes = ["negative", "positive", "polar", "nonpolar", "special"]
+# Residue attributes for coloring
+_RES_ATTRIBUTES = ["negative", "positive", "polar", "nonpolar", "special"]
 
 
 # Regular expression for HEX colors
 _HEX_COLOR_LONG = re.compile(r'^[0-9a-fA-F]{6}$')
 _HEX_COLOR_SHORT = re.compile(r'^[0-9a-fA-F]{3}$')
-
 
 class Color:
     """Converts and manipulates common PyMOL color representation: colorname, RGB, or HEX. PyMOL API only."""
@@ -223,7 +238,7 @@ class Palette(list):
             key (expr): A function to specify the sorting criteria(s)
             reverse (bool): Will sort the list in descending order
         Example:
-            >>> plt = Palette('0F0',  'F00', 'F0F', '00F', 'FF0', '0FF')
+            >>> plt = Palette('0F0', 'F00', 'F0F', '00F', 'FF0', '0FF')
             >>> plt.sort(key=lambda x: colorsys.rgb_to_hls(*x))
             >>> print([c.to_hex() for c in plt])
             ['ff0000', 'ffff00', '00ff00', '00ffff', '0000ff', 'ff00ff']    
@@ -263,7 +278,7 @@ class Palette(list):
             '808000'
             >>> nsteps = 10
             >>> for i in range(nsteps + 1): 
-            >>>     plt.interp(i / nsteps).to_hex()
+            ...     plt.interp(i / nsteps).to_hex()
         """
         x = min(max(0., frac), 1.) * (len(self) - 1)
         if x.is_integer():
@@ -276,42 +291,51 @@ class Palette(list):
 
 
 @cmd.extend
-def cbo(selection="(all)", *, _self=cmd):
+def cbo(selection="all", *, _self=cmd):
     """
     DESCRIPTION
-        Color by objects
+        Color by objects.
     USAGE
-        cbc [ selection ]
+        cbo [ selection ]
+    ARGUMENTS
+        selection : str, optional
+           Atom selection. 
     """
     color = itertools.cycle(_color_cycle)
     for obj in _self.get_names("public_objects", 0, selection):
         _self.color(next(color), f"({selection}) & %{obj}")
-    return
 
 
 @cmd.extend
-def cbc(selection="(all)", *, _self=cmd):
+def cbc(selection="all", *, _self=cmd):
     """
     DESCRIPTION
-        Color by chains
+        Color by chains.
     USAGE
         cbc [ selection ]
+    ARGUMENTS
+        selection : str, optional
+           Atom selection. 
     """
     colors = itertools.cycle(_color_cycle)
     for chain in _self.get_chains(selection):
         _self.color(next(colors), f"({selection}) & c. '{chain}'")
-    return
 
 
 @cmd.extend
-def cbe(selection="(all)", *, _self=cmd, **kwargs):
+def cbe(selection="all", *, _self=cmd, **kwargs):
     """
     DESCRIPTION
         Color by elements. By default skips coloring carbons.
     USAGE
-        cbe [ selection [, <element>=<color> ]]
+        cbe [ selection [, ... ]]
+    ARGUMENTS
+        selection : str, optional
+           Atom selection.
+        kwargs : Any
+            Define color for each element. 
     EXAMPLE
-        cbe (all), C=green, oxygen=red
+        >>> cbe('all', 'C'='green', 'oxygen'='red')
     """
     colors = {
         "H": "white",
@@ -323,69 +347,88 @@ def cbe(selection="(all)", *, _self=cmd, **kwargs):
     colors.update(**kwargs)
     for element, color in colors.items():
         _self.color(color, f"({selection}) & e. {element}")
-    return
 
 
 @cmd.extend
-def cbi(selection="(all)", palette="rainbow2", *, _self=cmd):
+def cbi(selection="all", palette="rainbow2", *, _self=cmd):
     """
     DESCRIPTION
-        Color by residue index.
+        Color each chain in selection by residue index.
     USAGE
-        cbi [selection]
+        cbi [ selection [, palette ]]
+    ARGUMENTS
+        selection : str, optional
+           Atom selection.
+        palette : str, default = 'rainbow2'
+            Palette name or space separated list of colors.
     """
     for chain in _self.get_chains(selection):
         _self.spectrum("resi", palette, f"({selection}) & c. '{chain}'")
-    return
 
 
 @cmd.extend
-def cbattr(selection="(all)", attribute=[], _self=cmd):
+def cbattr(selection="all", attributes=None, *, _self=cmd):
     """
     DESCRIPTION
-        Color by residue attribute.
+        Color by residue by attributes: `negative` (red), `positive` (blue),
+        `polar` (green), `nonpolar` (yellow), and/or `special` (gray).
     USAGE
-        cbattr [ selection [, attribute ]]
+        cbattr [ selection [, attributes ]]
     ARGUMENTS
-        selection = str: Atom selection {default: all}
-        attribute = str|list: Attributes to color {default: None}
-    NOTES
-        Available attributes: 
-            negative, positive, polar, nonpolar, and special
+        selection : str, optional
+            Atom selection.
+        attributes : str or list, default = None
+            Attributes to color, where `None` colors all.
+    EXAMPLE
+        >>> cbattr('all', ['negative', 'positive'])
     """
-    if not attribute:
-        attribute = _attributes
-
-    if _self.is_string(attribute):
+    colors = {
+        "negative": "red",
+        "positive": "marine",
+        "polar": "tv_green",
+        "nonpolar": "yellow",
+        "special": "gray",
+    }
+    if not attributes:
+        attributes = _RES_ATTRIBUTES
+    if _self.is_string(attributes):
         try:
-            attribute = _self.safe_list_eval(attribute)
+            attributes = _self.safe_list_eval(attributes)
         except:
-            attribute = attribute.split()
+            attributes = attributes.split()
 
-    if "negative" in attribute:
-        res = ["ASP", "GLU"]
-        _self.color("red", f"({selection}) & resn {'+'.join(res)}")
-    if "positive" in attribute:
-        res = ["ARG", "HIS", "LYS"]
-        _self.color("marine", f"({selection}) & resn {'+'.join(res)}")
-    if "polar" in attribute:
-        res = ["ASN", "GLN", "SER", "THR"]
-        _self.color("tv_green", f"({selection}) & resn {'+'.join(res)}")
-    if "nonpolar" in attribute:
-        res = ["ALA", "ILE", "LEU", "MET", "PHE", "TRP", "TYR", "VAL"]
-        _self.color("yellow", f"({selection}) & resn {'+'.join(res)}")
-    if "special" in attribute:
-        res = ["CYS", "GLY", "PRO"]
-        _self.color("gray", f"({selection}) & resn {'+'.join(res)}")
+    for attr in attributes:
+        attr = attr.lower()
+        if attr == "negative":
+            residues = ["ASP", "GLU"]
+        elif attr == "positive":
+            residues = ["ARG", "HIS", "LYS"]
+        elif attr == "polar":
+            residues = ["ASN", "GLN", "SER", "THR"]
+        elif attr == "nonpolar":
+            residues = ["ALA", "ILE", "LEU", "MET", "PHE", "TRP", "TYR", "VAL"]
+        elif attr == "special":
+            residues = ["CYS", "GLY", "PRO"]
+        else:
+            print(f"Error: Unknown attribute '{attr}'")
+            continue
+        # Color according to attribute
+        _self.color(
+            colors.get(attr),
+            f"({selection}) & resn {'+'.join(residues)}"
+        )
 
 
 @cmd.extend
-def cbalpha(selection="(all)", *, _self=cmd):
+def cbalpha(selection="all", *, _self=cmd):
     """
     DESCRIPTION
-        Color by C alpha atom.
+        Color residues by C-alpha atom.
     USAGE
-        cbalpha [selection]
+        cbalpha [ selection ]
+    ARGUMENTS
+        selection : str, optional
+            Atom selection.
     """
     color_list = collections.defaultdict(lambda: 25) # gray is default
     _self.iterate(f"bca. ({selection})",
@@ -393,20 +436,22 @@ def cbalpha(selection="(all)", *, _self=cmd):
     _self.alter(selection,
                 "color = color_list[object,segi,chain,resi]", space=locals())
     _self.recolor()
-    return
 
 
 @cmd.extend
 def cbs(selection="all", palette="rainbow", repr="ribbon", *, _self=cmd):
     """
     DESCRIPTION
-        Color object by state
+        Color object by state. Experimental and very finicky.
     USAGE
         cbs [ selection [, palette [, repr ]]]
     ARGUMENTS
-        selection = str: Atom selection {default: all}
-        palette = str|list: List of colors {default: rainbow}
-        repr = str: Representation to color {default: ribbon}
+        selection : str, optional
+            Atom selection.
+        palette : str, default = 'rainbow'
+            Palette name or space separated list of colors.
+        repr : str, default = 'ribbon'
+            Molecule representation to color.
     EXAMPLE
         >>> set all_states, 1
         >>> show_as ribbon
@@ -459,14 +504,18 @@ def cbs(selection="all", palette="rainbow", repr="ribbon", *, _self=cmd):
 
 
 @cmd.extend
-def set_colors(scheme, *, _self=cmd):
+def set_color_palette(scheme, *, _self=cmd):
     """
     DESCRIPTION
-        Set elements color scheme.
+        Set elements color palette. Supported palettes:
+
+        * jmol
+        * [more coming soon]
     USAGE
         set_colors scheme
-    SCHEMES
-        jmol, [more coming soon]
+    ARGUMENTS
+        scheme : str
+            Available color scheme. 
     """
     if scheme == "jmol":
         _self.set("auto_color", 0)
@@ -480,14 +529,18 @@ def set_colors(scheme, *, _self=cmd):
 
 
 @cmd.extend
-def get_colors(selection="(all)", *, quiet=1, _self=cmd):
+def get_colors(selection="all", *, quiet=1, _self=cmd):
     """
     DESCRIPTION
         Get color of atoms in selection. Returns list of indices and RGB tuples.
     USAGE
-        get_colors [selection [, quiet ]]
-    PYMOL API
-        get_colors(selection) -> [(index, (r, g, b)), ... ]
+        get_colors [ selection ]
+    ARGUMENTS
+        selection : str, optional
+            Atom selection.
+    RETURNS
+        : List(Tuple(int, Tuple(int, int, int)))
+            List of tuples containing atom indices and RGB color tuple. 
     """
     color_list = []
     get_color_tuple = _self.get_color_tuple
@@ -511,7 +564,7 @@ cmd.auto_arg[0].update({
     "get_colors": cmd.auto_arg[0]["zoom"],
 })
 cmd.auto_arg[1].update({
-    "cbattr": [cmd.Shortcut(_attributes), "arg", ""],
+    "cbattr": [cmd.Shortcut(_RES_ATTRIBUTES), "arg", ""],
     "cbi": cmd.auto_arg[1]["spectrum"],
     "cbs": cmd.auto_arg[0]["color"],
 })
@@ -519,6 +572,14 @@ cmd.auto_arg[2].update({
     "cbs": cmd.auto_arg[0]["as"]
 })
 
+# ---------------------------------------------------------------------
+# Custom colors selection in color selection menu
+
+# NOTE: For dropdown menu color preview PyMOL uses `3-digit decimal`
+# color representation... it took me a while to figure out.
+# Here is formula how to convert from RGB to ... *this*
+# >>> color = [62, 198, 146]
+# >>> [round(c / 255 * 9) for c in color]
 
 # Custom colors
 cmd.set_color("flat.green", [62, 198, 146])
@@ -544,7 +605,7 @@ menu.all_colors_list.append(
     ]),
 )
 
-# Novartis colors and palettes 
+# NVS colors
 cmd.set_color("nvs.orange", [255, 78, 0])  #ff4e00
 cmd.set_color("nvs.cream", [201, 217, 249])  #c9d9f9
 cmd.set_color("nvs.blue", [4, 96, 169])  #0460a9
@@ -566,7 +627,7 @@ menu.all_colors_list.append(
     ]),
 )
 
-# AlphaFold colors and palettes
+# AlphaFold colors
 cmd.set_color("af.high", [0, 83, 214])
 cmd.set_color("af.medium", [101, 203, 243])
 cmd.set_color("af.low", [255, 219, 19])

@@ -13,6 +13,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""
+:mod:`flat.editing`
+===================
+Module for editing molecular objects.
+"""
+
 from pymol import cmd, CmdException
 import numpy as np
 import sys
@@ -22,19 +28,32 @@ _UNWRAP_MODES = ["residues", "chains", "segments", "bonds"]
 
 
 @cmd.extend
-def renumber(selection, start=1, quiet=False, *, _self=cmd):
+def renumber(selection, start=1, *, quiet=0, _self=cmd):
     """
     DESCRIPTION
-        Renumber sets new residue numbers (resi) for a polymer based on connectivity. 
+        Renumber sets new residue numbers (`resi`) for 
+        a polymer based on connectivity.
+    USAGE
+        renumber selection [, start ]
     ARGUMENTS
-        selection = string: atom selection to renumber {default: all}
-        start = integer: counting start {default: 1}
+        selection : str
+            Atom selection.
+        start : int, default = 1
+            Numbering start.
+    RETURNS
+        : Tuple(int, int)
+            First and last index in renumbering.  
     """
     # See: https://pymolwiki.org/index.php/Renumber
     start, quiet = int(start), bool(quiet)
     model = _self.get_model(selection)
+    if not model.atom:
+        raise CmdException("Invalid selection")
+
+    # NOTE: Increase recursion limit for large molecules
     limit = sys.getrecursionlimit()
     sys.setrecursionlimit(10**5)
+    
     _self.iterate(
         selection,
         "next(atom_it).model = model",
@@ -43,7 +62,6 @@ def renumber(selection, start=1, quiet=False, *, _self=cmd):
             "next": next,
         }
     )
-
     startatom = model.atom[0]
     for atom in model.atom:
         atom.adjacent = []
@@ -54,6 +72,8 @@ def renumber(selection, start=1, quiet=False, *, _self=cmd):
         atoms[1].adjacent.append(atoms[0])
     minmax = [start, start]
 
+    # Traverse model and increase residue number if
+    # we pass specific bonds (peptide, disulfide, etc.)
     def traverse(atom, resi):
         atom.resi = resi
         atom.visited = True
@@ -70,6 +90,7 @@ def renumber(selection, start=1, quiet=False, *, _self=cmd):
                 traverse(other, resi)
         return
 
+    # Let's do this
     traverse(startatom, start)
     _self.alter(
         selection,
@@ -79,9 +100,13 @@ def renumber(selection, start=1, quiet=False, *, _self=cmd):
             "next": next,
         }
     )
+
+    # Set back original recursion limit
     sys.setrecursionlimit(limit)
+
     if not quiet:
-        print(" Renumber: range (%d to %d)" % tuple(minmax))
+        print("Renumber: range (%d to %d)" % tuple(minmax))
+
     return tuple(minmax)
 
 
@@ -89,16 +114,17 @@ def renumber(selection, start=1, quiet=False, *, _self=cmd):
 def wrap(selection="all", *, _self=cmd):
     """
     DESCRIPTION
-        Shift the contents of a given selection back into the unit cell.
-        ```
-        +-----------+            +-----------+
-        |       1-2-|-3-4  -->   |-3-4   1-2-|
-        +-----------+            +-----------+
-        ```
+        Shift the contents of a given selection back into the unit cell::
+
+            +-----------+            +-----------+
+            |       1-2-|-3-4  -->   |-3-4   1-2-|
+            +-----------+            +-----------+
+
     USAGE
         wrap [ selection ]
     ARGUMENTS
-        selection = str: atoms to consider {default: (all)}  
+        selection : str, optional
+            Atoms selection. 
     """
     states = _self.count_states(selection)
     for state in range(1, states + 1):
@@ -112,18 +138,20 @@ def wrap(selection="all", *, _self=cmd):
 def unwrap(selection="all", mode="chains", *, _self=cmd):
     """
     DESCRIPTION
-        Move all atoms in an selection so that bonds don't split over images
-        ```
-        +-----------+        +-----------+
-        |-3-4   1-2-|  -->   |       1-2-|-3-4
-        +-----------+        +-----------+
-        ```
+        Move all atoms in an selection so that bonds don't split over images::
+
+            +-----------+        +-----------+
+            |-3-4   1-2-|  -->   |       1-2-|-3-4
+            +-----------+        +-----------+
+
     USAGE
         unwrap [ selection [, mode ]]
     ARGUMENTS
-        selection = str: atoms to consider {default: (all)}
-        mode = str: The group which will be kept together through the shifting
-                    process: residues, chains, segments, bonds {default: chains}
+        selection : str, optional
+            Atoms selection. 
+        mode : str, default = 'chains'
+            The group which will be kept together through the shifting
+            process: `residues`, `chains`, `segments`, or `bonds`.
     """
     # Get model object and modify it
     model = _self.get_model(selection)
@@ -198,7 +226,7 @@ def unwrap(selection="all", mode="chains", *, _self=cmd):
         network = segments.values()
 
     else:
-        raise CmdException(f"Unknown unwrap mode: {mode}")
+        raise CmdException(f"Unknown unwrap mode: {mode!r}")
 
     # Traverse network and make molecules whole again
     states = _self.count_states(selection)
@@ -225,6 +253,11 @@ def align2eigen(selection="all", state=0, *, _self=cmd):
         Align selection with it's eigen vector. 
     USAGE
         align2eigen [ selection [, state ]]
+    ARGUMENTS
+        selection : str, optional
+            Atoms selection. 
+        state : int, default = 0
+            Which state to consider.
     """
     xyz = _self.get_coords(selection, state)
     # Center coordinates
@@ -246,20 +279,37 @@ def align2points(selection="all", pk1="(pk1)", pk2="(pk2)", pk3="(pk3)", state=0
     """
     DESCRIPTION
         Align selection with three selected point i.e. angle formed by selections 
-        (pk1), (pk2), and (pk3) which can be set using the "PkAt" mouse action
-        (typically, Ctrl-middle-click).
+        `(pk1)`, `(pk2)`, and `(pk3)` which can be set using the `PkAt` mouse action
+        (typically, :kbd:`Ctrl` + :kbd:`middle-click`).
+
+        New vector base is defined as::
+
+              y (pk3)
+              |
+              | 
+            (pk2) -- x (pk1)
+             /
+            z 
+
     USAGE
-        align2points [ selection [, pk1, pk2, pk3, [, state ]]]
+        align2points [ selection [, pk1, [, pk2 [, pk3, [, state ]]]]]
+    ARGUMENTS
+        selection : str, optional
+            Atoms selection. 
+        pk1, pk2, pk3 : str, default = '(pk1)', '(pk2)', '(pk2)'
+            Points that will be used to define new orthonormal base.
+        state : int, default = 0
+            Which state to consider.
     """
     angle = _self.get_angle(pk1, pk2, pk3)
     if not angle:
         raise ValueError("Selection must be non-colinear points")
     v1 = _self.get_coords(pk1, state)
-    v2 = ref = _self.get_coords(pk2, state)
+    v2 = _self.get_coords(pk2, state) # Ref
     v3 = _self.get_coords(pk3, state)
     # Define a new base
-    vx = v1 - ref
-    vz = np.cross(v3 - ref, vx)
+    vx = v1 - v2
+    vz = np.cross(v3 - v2, vx)
     vy = np.cross(vz, vx)
     # Normalize base
     vx /= np.linalg.norm(vx)
@@ -268,19 +318,29 @@ def align2points(selection="all", pk1="(pk1)", pk2="(pk2)", pk3="(pk3)", state=0
     # Stack to matrix
     base = np.array([vx, vy, vz]).reshape(3, 3).T
     # Transform to new base
-    xyz = _self.get_coords(selection, state) - ref
+    xyz = _self.get_coords(selection, state) - v2
     xyz = np.matmul(xyz, base)
-    _self.load_coords(xyz + ref, selection, state=state)
-    # Update selection
-    _self.edit(pk1, pk2, pk3)
-
+    _self.load_coords(xyz + v2, selection, state=state)
+ 
 
 @cmd.extend
-def split(operator, selection, prefix="entity", *, _self=cmd):
+def split(operator, selection="all", name="obj", *, _self=cmd):
     """
     DESCRIPTION
         Create a single object for each entity in selection, defined by operator
         (e.g. bymolecule, bysegment, ...). Returns the number of created objects.
+    USAGE
+        split operator [, selection [, name ]]
+    ARGUMENTS
+        operator : str
+            Operator to split selection by (e.g. bymolecule).
+        selection : str, optional
+            Atoms selection.
+        name : str, default = 'obj'
+            Name of generated object(s).
+    RETURNS
+        : int
+            Number of created objects.
     SOURCE
         From PSICO (c) 2011 Thomas Holder, MPI for Developmental Biology
     """
@@ -290,8 +350,8 @@ def split(operator, selection, prefix="entity", *, _self=cmd):
 
     r = 0
     while _self.count_atoms(tmp) > 0:
-        name = _self.get_unused_name(prefix)
-        _self.extract(name, operator + " first model " + tmp)
+        obj = _self.get_unused_name(name)
+        _self.extract(obj, operator + " first model " + tmp)
         r += 1
 
     _self.delete(tmp)
@@ -304,10 +364,12 @@ def remove_alt(selection="all", keep="first", quiet=1, *, _self=cmd):
     DESCRIPTION
         Remove alternative location atoms.
     USAGE
-        remove_alt [selection [, keep]]
+        remove_alt [ selection [, keep ]]
     ARGUMENTS
-        selection = string: atom selection
-        keep = string: AltLoc to keep, or "first" to keep the first observed AltLoc {default: first}
+        selection : str
+            Atom selection.
+        keep : str | int, default = 'first'
+            AltLoc to keep, or `first` to keep the first observed AltLoc
     SOURCE
         From PSICO (c) 2011 Thomas Holder, MPI for Developmental Biology 
     """
@@ -335,12 +397,10 @@ def remove_alt(selection="all", keep="first", quiet=1, *, _self=cmd):
         _self.alter(selection, "(alt,q)=("",1.0)")
         _self.sort()
 
-    return
-
 
 @cmd.extend
 def copy_identifiers(target, source, identifiers="segi chain resi",
-                       match="align", quiet=1, *, _self=cmd):
+                     match="align", *, _self=cmd):
     """
     DESCRIPTION
         Transfers identifiers e.g. segi, chain, and resi from one selection to another.
@@ -349,10 +409,14 @@ def copy_identifiers(target, source, identifiers="segi chain resi",
     USAGE
         copy_identifiers target, source [, identifiers [, match ]]
     ARGUMENTS
-        target = string: target selection 
-        source = string: source selection
-        identifiers = string: identifiers to copy {default: "segi,chain,resi"}
-        match = string: method how to match atoms {default: "align"}
+        target : str
+            Target selection. 
+        source : str
+            Source selection.
+        identifiers : str, default = 'segi chain resi'
+            Identifiers to copy. Separator is optional.
+        match : str, default = 'align'
+            Method how to match atoms.
     SOURCE
         From PSICO (c) 2011 Thomas Holder, MPI for Developmental Biology
     """
@@ -381,4 +445,5 @@ cmd.auto_arg[0].update({
 })
 cmd.auto_arg[1].update({
     "unwrap": [cmd.Shortcut(_UNWRAP_MODES), "method", ""],
+    "copy_identifiers": cmd.auto_arg[0]["zoom"]
 })

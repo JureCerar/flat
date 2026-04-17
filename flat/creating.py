@@ -13,10 +13,17 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""
+:mod:`flat.creating`
+====================
+Module for creating new molecular objects.
+"""
+
 from pymol import cmd, CmdException
 from . import three_letter
 
-sidechain_center_atoms = {
+# Cheat sheet for atom side chain fixing 
+_SIDECHAIN_CENTER_ATOMS = {
     "GLY": ("CA",),
     "ALA": ("CB",),
     "VAL": ("CG1", "CG2"),
@@ -40,9 +47,12 @@ sidechain_center_atoms = {
     "PRO": ("CB", "CG", "CD"),
 }
 
-sidechain_center_methods = ["bahar1996", "centroid"]
+# Available side chain center methods
+_SIDECHAIN_CENTER_METHODS = ["bahar1996", "centroid"]
 
-aromatic_center_atoms = { 
+
+# Atoms for determining center of aromatic residues
+_AROMATIC_CENTER_ATOMS = { 
     "PHE": ("CG", "CD1", "CD2", "CE1", "CE2", "CZ"),
     "TRP": ("CD2", "CE2", "CE3", "CZ2", "CZ3", "CH2"),
     "TYR": ("CG", "CD1", "CD2", "CE1", "CE2", "CZ",),
@@ -57,26 +67,30 @@ def sidechain_centers(selection="all", object="sidechain_centers", method="bahar
         in selection.
 
         Two methods are available:
-        (1) Sidechain interaction centers as defined by Bahar and Jernigan 1996
-            http://www.ncbi.nlm.nih.gov/pubmed/9080182
-        (2) Sidechain centroids, the pseudoatom is the centroid of all atoms except
-            hydrogens and backbone atoms (N, C and O).
 
-        With method "bahar1996", if a residue has all relevant sidechain center
+        1.  Sidechain interaction centers as defined by Bahar and Jernigan 1996
+            http://www.ncbi.nlm.nih.gov/pubmed/9080182  
+        2.  Sidechain centroids, the pseudoatom is the centroid of all atoms except
+            hydrogens and backbone atoms (N, C and O).  
+
+        With method `bahar1996`, if a residue has all relevant side-chain center
         atoms missing (for example a MET without SD), it will be missing in the
-        created pseudoatom object.
+        created pseudo-atom object.
 
-        With method "centroid", if you want to exclude C-alpha atoms from
-        sidechains, modify the selection like in this example:
+        With method `centroid`, if you want to exclude C-alpha atoms from
+        side-shains.
 
-        >>> sidechain_centers newobject, all and (not name CA or resn GLY), method=2
     USAGE
-        sidechain_centers [object [, selection [, method, [ name ]]]]
+        sidechain_centers [ selection [, object [, method, [ name ]]]]
     ARGUMENTS
-        object = string: name of object to create
-        selection = string: atoms to consider {default: (all)}
-        method = string: bahar1996 or centroid {default: bahar1996}
-        name = string: atom name of pseudoatoms {default: PS1}
+        selection : str, optional
+            Atom selection. 
+        object : str, default = 'sidechain_centers'
+            Name of object to create.
+        method : str, default = 'bahar1996'
+            Method for calculating residue centroid.
+        name : str, default = 'PS1'
+            Atom name of created pseudo-atoms.
     SOURCE
         From PSICO (c) 2010-2012 Thomas Holder
     """
@@ -85,9 +99,9 @@ def sidechain_centers(selection="all", object="sidechain_centers", method="bahar
     atmap = dict()
     if method in ["bahar1996", "1", 1]:
         modelAll = _self.get_model("(%s) and resn %s" % (
-            selection, "+".join(sidechain_center_atoms)))
+            selection, "+".join(_SIDECHAIN_CENTER_ATOMS)))
         for at in modelAll.atom:
-            if at.name in sidechain_center_atoms[at.resn]:
+            if at.name in _SIDECHAIN_CENTER_ATOMS[at.resn]:
                 atmap.setdefault(
                     (at.segi, at.chain, at.resn, at.resi), []).append(at)
     elif method in ["centroid", "2", 2]:
@@ -123,23 +137,29 @@ def sidechain_centers(selection="all", object="sidechain_centers", method="bahar
 def aromatic_centers(selection="all", object="aromatic_centers", name="PS1", *, _self=cmd):
     """
     DESCRIPTION
-        Creates an object with pseudoatoms representing atomatic centers for 
+        Creates an object with pseudo-atoms representing aromatic centers for 
         each residue in selection.
     USAGE
-        aromatic_centers [object [, selection [, name ]]]
+        aromatic_centers [selection [, object [, name ]]]
     ARGUMENTS
-        object = string: name of object to create
-        selection = string: atoms to consider {default: (all)}
-        name = string: atom name of pseudoatoms {default: PS1}
+        selection : str, optional
+            Atom selection. 
+        object : str, default = 'aromatic_centers'
+            Name of object to create.
+        name : str, default = 'PS1'
+            Atom name of created pseudo-atoms.
+    RETURNS
+        : chempy.model
+            Returns molecular model for aromatic centers.
     """
     from pymol.chempy import Atom, cpv, models
 
     atmap = dict()
 
-    res_names = "+".join(aromatic_center_atoms)
+    res_names = "+".join(_AROMATIC_CENTER_ATOMS)
     modelAll = _self.get_model(f"({selection}) and resn {res_names}")
     for at in modelAll.atom:
-        if at.name in aromatic_center_atoms[at.resn]:
+        if at.name in _AROMATIC_CENTER_ATOMS[at.resn]:
             atmap.setdefault((at.segi, at.chain, at.resn, at.resi), []).append(at)
 
     model = models.Indexed()
@@ -163,54 +183,50 @@ def aromatic_centers(selection="all", object="aromatic_centers", name="PS1", *, 
 
 
 @cmd.extend
-def com(selection="all", object=None, state=0, *, quiet=1, _self=cmd):
+def com(selection="all", name="COM", *, _self=cmd):
     """
     DESCRIPTION
         Calculates the center of mass. Considers atom mass and occupancy.
     USAGE
-        com [object [, selection [, name ]]]
+        com [ selection [, name ]]
     ARGUMENTS
-        selection = string: atoms to consider {default: (all)}
-        object = string: name of object to create {default: None}
-        state = int: object state, -1 for current state, 0 for all states {default: 0}
+        selection : str, optional
+            Atom selection. 
+        name : str, default = 'COM'
+            Name of object to create.
     """
-    state, quiet = int(state), int(quiet)
-    if (object == None):
-        try:
-            object = _self.get_legal_name(selection)
-            object = _self.get_unused_name(object + "_COM", 0)
-        except AttributeError:
-            object = "COM"
-    _self.delete(object)
-
-    if (state != 0):
-        x, y, z = _self.centerofmass(selection, state=state)
-        _self.pseudoatom(object, pos=[x, y, z])
-        _self.show("spheres", object)
-        
-    else:
-        for i in range(_self.count_states()):
-            x, y, z = _self.centerofmass(selection, state=i+1)
-            _self.pseudoatom(object, pos=[x, y, z], state=i+1)
-            _self.show("spheres", object)
+    if not name:
+        name = _self.get_unused_name("COM")
+    for i in range(_self.count_states(selection)):
+        x, y, z = _self.centerofmass(selection, state=i+1)
+        _self.pseudoatom(name, pos=[x, y, z], state=i+1)
+    _self.show("nonbonded", name)
 
 
 @cmd.extend
 def fragment(name, object=None, origin=1, zoom=0, quiet=1, *, _self=cmd):
     """
     DESCRIPTION
-        "fragment" retrieves a 3D structure from the fragment library,
-        which is currently pretty meager.
+        Retrieves a 3D structure from the fragment library, which is 
+        currently pretty meager.
+
+        This overload internal `fragment` function.
     USAGE
         fragment name [, object [, origin [, zoom ]]]
     ARGUMENTS
-        name = string: Name of library fragment 
-        object = string: Name of object to create {default: None}
-        origin = boolean: Center fragment at the current position {default: True}
-        zoom = boolean: Zoom view to fit fragment {default: False}
-    NOTE
-        This is an overloaded version of the 'fragment' function
+        name : str
+            Name of library fragment
+        object : str, default = None
+            Name of object to create. Default is fragment name.
+        origin : bool, default = True
+            Center fragment at the current position.
+        zoom : bool, default = False
+            Zoom view to fit fragment
+    RETURNS
+        : chempy.model
+            Chempy model of loaded fragment. 
     """
+    # NOTE: Do not change function signature
     import chempy
     import os
 
@@ -253,5 +269,5 @@ cmd.auto_arg[0].update({
 })
 
 cmd.auto_arg[2].update({
-    "sidechain_centers": [cmd.Shortcut(sidechain_center_methods), "method", ""],
+    "sidechain_centers": [cmd.Shortcut(_SIDECHAIN_CENTER_METHODS), "method", ""],
 })

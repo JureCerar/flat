@@ -14,13 +14,24 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-FLAT is a collection of scripts and utilities for PyMOL molecular visualizer.
+FLAT
+====
+FLAT is personal collection of scripts and utilities that extend functionality
+of PyMOL molecular visualization tool. The inspiration behind the library is to
+learn how to work with PyMOL and create a collection of useful functions for easy
+and convenient use.
+
+Source code is available in the public GitHub repository: https://github.com/JureCerar/flat
+
+Documentation
+-------------
+Documentation is available online at: https://app.readthedocs.org
 """
 
 __author__ = "Jure Cerar"
 __copyright__ = "Copyright (C) 2023-2026 Jure Cerar"
 __license__ = "GNU GPL v3.0"
-__version__ = "0.7.2"
+__version__ = "0.8.0"
 
 try:
     from pymol import cmd
