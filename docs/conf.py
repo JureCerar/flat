@@ -7,7 +7,6 @@ from datetime import datetime
 import re
 import sys
 import os
-import flat
 
 # -- Path setup --------------------------------------------------------------
 # If extensions (or modules to document with autodoc) are in another directory,
@@ -15,15 +14,18 @@ import flat
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 
 sys.path.insert(0, os.path.abspath("."))
+sys.path.insert(0, os.path.abspath("../"))
 sys.path.insert(0, os.path.abspath("./source/"))
 
 
 # -- Project information -----------------------------------------------------
 
-project = "Flat"
+from flat import __version__
+
+project = "FlatCAT"
 author = "Jure Cerar"
 copyright = f"2023-{datetime.now().year}, " + author
-packageversion = flat.__version__
+packageversion = __version__
 release = packageversion
 
 # -- General configuration ---------------------------------------------------
@@ -34,10 +36,13 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
+    "sphinx_rtd_theme",
 ]
 
 templates_path = ["templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+
+autodoc_mock_imports = ["numpy", "pymol"]
 
 napoleon_google_docstring = True
 napoleon_numpy_docstring = True  # optional, if you're not using NumPy style
