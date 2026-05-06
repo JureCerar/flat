@@ -164,6 +164,36 @@ def iterate_to_list(selection, expression, *, space=None, _self=cmd):
 
 
 @cmd.extend
+def iterate_state_to_list(state, selection, expression, *, space=None, _self=cmd):
+    """
+    DESCRIPTION
+        Capture "iterate_state" results in a list.
+    USAGE
+        iterate_state_to_list state, selection, expression
+    ARGUMENTS
+        state : int
+            Object state.
+        selection : str
+            Atom selection.
+        expression : str
+            Property or list of properties in valid PyMOL syntax.
+        space : Dict(), optional
+            Namespace dictionary. Defaults to PyMOL namespace.
+    RETURNS
+        : List
+            List of specified properties for selection.
+    """
+    outlist = []
+    _self.iterate_state(
+        state,
+        selection,
+        "outlist.append(({}))".format(expression),
+        space=dict(space or (), outlist=outlist),
+    )
+    return outlist
+
+
+@cmd.extend
 def ext_coef(selection="all", state=-1, *, quiet=0, _self=cmd):
     """
     DESCRIPTION
@@ -598,7 +628,7 @@ def get_contacts(selection1, selection2, name="contacts", state=0,
             Average number of each type of interactions: hydrogen bonds, 
             salt bridges, pi-cation, and pi-pi.
     SEE ALSO
-        :func:`get_raw_distances`
+        :func:`get_raw_distances`, :func:`prolif`
     """
     state = int(state)
 
@@ -732,5 +762,9 @@ cmd.auto_arg[0].update({
 })
 cmd.auto_arg[1].update({
     "iterate_to_list": cmd.auto_arg[0]["spectrum"],
+    "iterate_state_to_list": cmd.auto_arg[0]["zoom"],
     "get_contacts": cmd.auto_arg[0]["zoom"],
+})
+cmd.auto_arg[2].update({
+    "iterate_state_to_list": cmd.auto_arg[0]["spectrum"],
 })
