@@ -66,7 +66,7 @@ def _get_model_color(selection, *, _self=cmd):
 
 
 @cmd.extend
-def plot(expression="b", selection="all", fmt="-", byres=True,
+def plot(expression="b", selection="all", fmt=None, byres=True,
          filename=None, *, quiet=1, _self=cmd, **kwargs):
     """
     DESCRIPTION
@@ -78,8 +78,8 @@ def plot(expression="b", selection="all", fmt="-", byres=True,
             Atom property or expression to plot.
         selection : str, default = 'all'
             Atom selection.
-        fmt : str, default = '-'
-            Plotting format (see matplotlib documentation).
+        fmt : str, default = None
+            Plotting format (see matplotlib documentation). By default plot as bars. 
         byres : bool, default = True
             Plot properties per-residue instead of per-atom.
         filename : str, optional
@@ -91,55 +91,87 @@ def plot(expression="b", selection="all", fmt="-", byres=True,
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots()
-    lines = []
-    labels = []
+    handles = list()
+    labels = list()
+
+    xlim = (np.inf, -np.inf)
+    ylim = (np.inf, -np.inf)
+
+    def _index_to_hex(index):
+        """From PyMOL color index to hex"""
+        val = _self.get_color_tuple(index)
+        return "#%02x%02x%02x" % tuple(int(0xFF * v) for v in val)
 
     for model in _self.get_object_list(selection):
         for chain in _self.get_chains(model):
-            color = _get_model_color(
-                f"({selection}) & {model} & c. '{chain}'", _self=_self)
+            colors = list()
             x_list = list()
             y_list = list()
             label_list = list()
 
             if int(byres):
                 _self.iterate(
-                    f"bca. ({selection}) & {model} & c. '{chain}'",
-                    "x_list.append(int(resi));" + \
-                    f"y_list.append({expression});" + \
-                    "label_list.append(f'{model}/{segi}/{chain}/{resn}`{resi}');",
+                    f"guide & ({selection}) & /{model}//{chain}",
+                    f"x_list.append(int(resi));" +
+                    f"y_list.append({expression});" +
+                    "colors.append(color);" +
+                    "label_list.append(f'/{model}/{segi}/{chain}/{resn}`{resi}');",
                     space=locals(),
                 )
             else:
                 _self.iterate(
-                    f"{selection} & o. {model} & c. '{chain}'",
-                    "x_list.append(index);" +
+                    f"{selection} & /{model}//{chain}",
+                    f"x_list.append(index);" +
                     f"y_list.append({expression});" +
-                    "label_list.append(f'{model}/{segi}/{chain}/{resn}`{resi}/{name}');",
+                    "colors.append(color);" +
+                    "label_list.append(f'/{model}/{segi}/{chain}/{resn}`{resi}/{name}');",
                     space=locals(),
                 )
 
-            line, = ax.plot(x_list, y_list, fmt, color=color,
-                            label=f"{model}/{chain}", **kwargs)
-            lines.append(line)
+            colors = [_index_to_hex(c) for c in colors]
+
+            if not fmt:
+                handle = ax.bar(x_list, y_list, width=1, color=colors,
+                                label=f"{model}/{chain}", **kwargs)
+            else:
+                # Find most prominent color
+                color = max((colors.count(c), c) for c in colors)[1]
+                handle, = ax.plot(x_list, y_list, fmt, color=color,
+                                  label=f"{model}/{chain}", **kwargs)
+                
+            xlim = min(xlim[0], min(x_list)), max(xlim[1], max(x_list))
+            ylim = min(ylim[0], min(y_list)), max(ylim[1], max(y_list))
+
+            handles.append(handle)
             labels.append(label_list)
 
-    labels_dict = dict(zip(lines, labels))
+    labels_dict = dict(zip(handles, labels))
 
     try:
         import mplcursors
-        cursor = mplcursors.cursor(ax, hover=True)
+
+        cursor = mplcursors.cursor(ax, hover=False)
         @cursor.connect("add")
-        def add(sel):
-            sel.annotation.set_text(
-                # BUG: Pymol return sel.index as numpy.float64?
-                labels_dict[sel.artist][int(sel.index)]
-            )
+        def on_click(sel):
+            # BUG: Pymol return sel.index as numpy.float64?
+            sele = labels_dict[sel.artist][int(sel.index)]
+            sel.annotation.set_text(sele)
             sel.annotation.get_bbox_patch().set(fc="white", alpha=0.8)
+            _self.select(sele)
+            # _self.zoom(sele)
 
     except ImportError as error:
         warnings.warn(error)
 
+    # Set custom limits for x- and y-axis
+    yrange = ylim[1] - ylim[0]
+
+    ax.set_xlim(xlim[0] - 1, xlim[1] + 1)
+    ax.set_ylim(ylim[0] - 0.05 * yrange, ylim[1] + 0.05 * yrange)
+
+    # Plot grid and title
+    # ax.set_xlabel("Index")
+    # ax.set_ylabel(expression)
     ax.grid()
     fig.legend()
     _showfigure(fig, filename, quiet)
@@ -217,24 +249,17 @@ def plot_ramachandran(selection="guide", fmt=".", state=-1, ref=1,
         :func:`phi_psi`
     """
     import matplotlib.pyplot as plt
+
     fig, ax = plt.subplots()
+    handles = list()
+    labels = list()
 
-    ax.axis([-180, 180, -180, 180])
-    ax.set(
-        xticks=range(-180, 181, 60),
-        yticks=range(-180, 181, 60),
-        xlabel=r"$\phi$ [deg]",
-        ylabel=r"$\psi$ [deg]"
-    )
-
-    lines, labels = [], []
     for model in _self.get_object_list(selection):
         for chain in _self.get_chains(model):
-
-            color = _get_model_color(
-                f"({selection}) & {model} & c. '{chain}'", _self=_self)
-            r = _self.get_phipsi(
-                f"({selection}) & {model} & c. '{chain}'", state, _self=_self)
+            color = _get_model_color(f"({selection}) & /{model}//{chain}",
+                                     _self=_self)
+            r = _self.get_phipsi(f"({selection}) & /{model}//{chain}",
+                                 state, _self=_self)
             
             if not r or not isinstance(r, dict):
                 warnings.warn(f"No dihderal angles found for: '{model}/{chain}'")
@@ -244,34 +269,33 @@ def plot_ramachandran(selection="guide", fmt=".", state=-1, ref=1,
             for model, index in sorted(r):
                 _self.iterate(
                     f"{model}`{index}",
-                    "residues.append(f'{model}/{segi}/{chain}/{resn}`{resi}')",
+                    "residues.append(f'/{model}/{segi}/{chain}/{resn}`{resi}')",
                     space=locals(),
                 )
 
             xy = np.array(list(r.values())).T
-            line, = ax.plot(xy[0], xy[1], fmt, color=color,
+            handle, = ax.plot(xy[0], xy[1], fmt, color=color,
                             label=f"{model}/{chain}", zorder=2, **kwargs)
             
-            lines.append(line)
+            handles.append(handle)
             labels.append(residues)
             
-    labels_dict = dict(zip(lines, labels))
+    labels_dict = dict(zip(handles, labels))
 
     try:
         # Add interactive cursors
         import mplcursors
+        
         cursor = mplcursors.cursor(ax, hover=True)
         @cursor.connect("add")
-        def add(sel):
-            sel.annotation.set_text(
-                # BUG: Pymol return sel.index as numpy.float64?
-                labels_dict[sel.artist][int(sel.index)]
-            )
+        def on_hover(sel):
+            # BUG: Pymol return sel.index as numpy.float64?
+            sele = labels_dict[sel.artist][int(sel.index)]
+            sel.annotation.set_text(sele)
             sel.annotation.get_bbox_patch().set(fc="white", alpha=0.8)
 
     except ImportError as error:
         warnings.warn(error)
-
 
     if int(ref):
         # Load reference Ramachandra plot
@@ -283,9 +307,15 @@ def plot_ramachandran(selection="guide", fmt=".", state=-1, ref=1,
         Z = np.load(rama_ref)
         ax.contourf(X, Y, Z, levels=levels, colors=colors, zorder=0)
 
+    ax.set_xlim(-180, 180)
+    ax.set_ylim(-180, 180)
+    ax.set_xticks(range(-180, 181, 60))
+    ax.set_yticks(range(-180, 181, 60))
+    ax.set_xlabel(r"$\phi$ [deg]")
+    ax.set_ylabel(r"$\psi$ [deg]")
+
     ax.grid(zorder=1)
     fig.legend()
-
     _showfigure(fig, filename, quiet)
 
     return fig
