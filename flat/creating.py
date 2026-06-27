@@ -17,6 +17,41 @@
 :mod:`flat.creating`
 ====================
 Module for creating new molecular objects.
+
+Custom fragments
+----------------
+List of custom fragments added to library: 
+
+=========  ===================================
+Code       Name                          
+=========  ===================================
+`CSD`_     CYSTEINESULFINIC ACID
+`DAH`_     DOPA
+`IAS`_     ASPARTIC ACID
+`KYN`_     KYNURENINE
+`OCS`_     CYSTEINESULFONIC ACID
+`OHI`_     
+`OMT`_     DIOXYMETHIONINE
+`PCA`_     PYROGLUTAMIC ACID
+`SMC`_     METHYLCYSTEINE
+`SME`_     METHIONINE SULFOXIDE
+`SNN`_     SUCCINIMIDE
+`TPO`_     PHOSPHOTHREONINE
+=========  ===================================
+
+.. _CSD: https://www.rcsb.org/ligand/CSD
+.. _DAH: https://www.rcsb.org/ligand/DAH
+.. _IAS: https://www.rcsb.org/ligand/IAS
+.. _KYN: https://www.rcsb.org/ligand/KYN
+.. _OCS: https://www.rcsb.org/ligand/OCS
+.. _OHI: https://www.rcsb.org/ligand/OHI
+.. _OMT: https://www.rcsb.org/ligand/OMT
+.. _PCA: https://www.rcsb.org/ligand/PCA
+.. _SMC: https://www.rcsb.org/ligand/SMC
+.. _SME: https://www.rcsb.org/ligand/SME
+.. _SNN: https://www.rcsb.org/ligand/SNN
+.. _TPO: https://www.rcsb.org/ligand/TPO
+
 """
 
 from pymol import cmd, CmdException
