@@ -48,7 +48,7 @@ CONTACT_COLORS = {
 }
 
 @cmd.extend
-def prolif(sele_lig, sele_pro="polymer", state=-1, prefix="prolif.", *, quiet=0, _self=cmd):
+def prolif(sele_lig, sele_pro="polymer", state=-1, prefix="prolif.", rep="lines", *, quiet=0, _self=cmd):
     """
     DESCRIPTION
         Find interactions with ProLIF.
@@ -63,6 +63,8 @@ def prolif(sele_lig, sele_pro="polymer", state=-1, prefix="prolif.", *, quiet=0,
             Object state (-1 for current state).
         prefix : str, default = 'prolif.'
             Name of output group.
+        rep : str, default = 'lines'
+            Representation for contacting protein residues.
     EXAMPLE
         >>> fetch 1eve
         >>> h_add
@@ -97,6 +99,7 @@ def prolif(sele_lig, sele_pro="polymer", state=-1, prefix="prolif.", *, quiet=0,
     assert len(fp.ifp) == 1
 
     i_pro_all = set()
+    i_lig_all = set()
 
     if prefix.endswith("."):
         _self.group(prefix.removesuffix("."))
@@ -117,6 +120,7 @@ def prolif(sele_lig, sele_pro="polymer", state=-1, prefix="prolif.", *, quiet=0,
                 s_lig = " ".join(idx_lig[i] for i in i_lig)
 
                 i_pro_all.update(i_pro)
+                i_lig_all.update(i_lig)
 
                 if len(i_lig) > 1:
                     _self.pseudoatom(pseudo, s_lig, resi=inter_num,
@@ -136,6 +140,12 @@ def prolif(sele_lig, sele_pro="polymer", state=-1, prefix="prolif.", *, quiet=0,
                     _self.color(color, objname)
     
     _self.delete(pseudo)
+
+    if rep:
+        s_pro = " ".join(idx_pro[i] for i in i_pro_all)
+        _self.show(rep, f"byres ({s_pro})")
+        s_lig = " ".join(idx_lig[i] for i in i_lig_all)
+        _self.show(rep, f"byres ({s_lig})")
 
 
 # Autocomplete

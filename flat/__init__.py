@@ -31,7 +31,7 @@ Documentation is available online at: https://flatcat.readthedocs.io/en/latest/
 __author__ = "Jure Cerar"
 __copyright__ = "Copyright (C) 2023-2026 Jure Cerar"
 __license__ = "GNU GPL v3.0"
-__version__ = "0.8.1"
+__version__ = "0.8.2"
 
 try:
     from pymol import cmd
